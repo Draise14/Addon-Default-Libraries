@@ -1,0 +1,35 @@
+# This is an Asset Catalog Definition file for blend files.
+#
+# Empty lines and lines starting with `#` will be ignored.
+# The first non-ignored line should be the version indicator.
+# Other lines are of the format "UUID:catalog/path/for/assets:simple catalog name"
+
+VERSION 1
+
+20797f8e-3ba1-4c87-a952-e8b579ee6cc6:Actions:Actions
+8250fedd-f0e8-4f30-a82c-4ec132b06062:Collections:Collections
+7c733bd7-3957-42da-b067-7ee3691e2187:Collections/Characters:Collections-Characters
+fe2efd2a-b482-4543-b917-8222f6f1cabf:Collections/Lights:Collections-Lights
+2047f9d0-6fd3-4fb8-9227-8e7b125895bf:Collections/Props:Collections-Props
+f39f8d44-ec5d-43a7-8849-d745f20b9794:Collections/Sets:Collections-Sets
+e27a00eb-0050-4714-b22c-fe27c3128afa:Images:Images
+6fb38818-1a3d-4f90-8fdb-b7883ab58436:Materials:Materials
+f67eb4b2-1e9f-43fe-8c7c-c13c090b529e:Materials/Leather:Materials-Leather
+101582ce-aad6-4fef-9343-065a45d1c46c:Materials/Metals:Materials-Metals
+29d8b698-c6b2-48a8-9053-4fe10fbb50cc:Materials/Wood:Materials-Wood
+12fb39dd-73a9-43ee-9371-3d42336f96ec:Node Groups:Node Groups
+b68767e9-8650-4e4e-af45-61601ed90b54:Node Groups/Compositor Nodes:Node Groups-Compositor Nodes
+475219fc-8e23-40c6-a325-d008085d6411:Node Groups/Geometry Nodes:Node Groups-Geometry Nodes
+51079125-b4b6-4918-b5b2-79d240a74c83:Node Groups/Shader Nodes:Node Groups-Shader Nodes
+59d20e91-69f9-4d55-8eec-87ed6d8f1ae5:Node Groups/Shader Nodes/Coordinates:Node Groups-Shader Nodes-Coordinates
+ee99fef1-67f7-4d64-86ef-318131f082bd:Node Groups/Shader Nodes/Layers:Node Groups-Shader Nodes-Layers
+4d896561-7caa-4006-a752-bfa8195b8d5e:Node Groups/Shader Nodes/Masks:Node Groups-Shader Nodes-Masks
+e167f89e-e73e-4a37-abd0-0e495fb46f5b:Node Groups/Shader Nodes/Materials:Node Groups-Shader Nodes-Materials
+34390a32-f257-4773-8742-5c09d4df8ed2:Node Groups/Shader Nodes/Materials/Metal:Node Groups-Shader Nodes-Materials-Metal
+acb89b03-61e3-47a6-a7f9-9fba87369ffd:Objects:Objects
+d920cf24-92a5-4dfa-acf0-bf1c82bcd4a6:Objects/Armatures:Objects-Armatures
+b6b27dcc-af60-4a57-b83e-aa2cce11d670:Objects/Cameras:Objects-Cameras
+dcd42b80-6f6d-4793-9835-a0faea8b9c1f:Objects/Catalog:Objects-Catalog
+e9f3ca34-ced5-48bb-9184-4f82e566454b:Objects/Greasepencils:Objects-Greasepencils
+512da26e-73a3-4ee6-a358-1c79d75d3aad:Textures:Textures
+c9c6079c-b1ec-46cc-9e45-e2475aa11b06:Worlds:Worlds
