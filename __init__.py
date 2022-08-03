@@ -1,8 +1,5 @@
 # ##### BEGIN GPL LICENSE BLOCK #####
 #
-#  <Template script for an asset library addon. Download and instructions on my GitHub page.>
-#    Copyright (C) <2022>  <Blender Defender> <https://www.github.com/BlenderDefender>
-#
 #  This program is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU General Public License
 #  as published by the Free Software Foundation; either version 3
@@ -21,16 +18,8 @@
 
 # -----------------------------------------------------------------------------
 # ! IMPORTANT! READ THIS WHEN SETTING UP THE LIBRARY
-# This template can be used for your free and commercial asset libraries, according to the GPL.
-# After you have created your asset files and downloaded this template, do the following steps:
-# 1. Make sure that this file is called __init__.py It MUST be this exact name.
-# 2. Create a folder named however you like. A pattern like asset-library-name is recommended.
-# 3. Replace the addon name [Asset Library Name] in line 47 and 59 with your library name.
-# 4. Replace the author [Your Name] in line 48 with your name or pseudonym.
-# 5. Add a link to the documentation of your library in line 51 and for reporting issues in line 52
-# 6. (Optional, recommended) Implement Super Addon Manager to support automatic updates.
-#    To do this, follow the documentation found at https://www.example.com/todo and paste the Endpoint URL
-#    in line 54
+# This is a work in progress, and many assets, categories, thumbnails and more are subject to change.
+# Use at own risk. 
 # -----------------------------------------------------------------------------
 
 import bpy
@@ -51,8 +40,9 @@ bl_info = {
     "blender": (3, 2, 1),
     "location": "Asset Browser>Default Library",
     "description": "Adds a default library with complementary assets that you can use from the Asset Browser Editor",
-    "doc_url": "",
-    "tracker_url": "",
+    "warning": "This is the first iteration of the default asset library. Expect changes. Use at own risk.",
+    "doc_url": "https://github.com/Bforartists/Manual",
+    "tracker_url": "https://github.com/Bforartists/Bforartists",
     # Please go to https://github.com/BlenderDefender/implement_addon_updater to implement support for automatic library updates:
     "endpoint_url": "",
     "category": "Import-Export"
@@ -83,9 +73,12 @@ class LIBADDON_APT_preferences(AddonPreferences):
         layout.label(
             text=f"{LIB_NAME} - Version {'.'.join(map(str, addon_version))}")
         layout.label(
-            text="To access these assets, switch to the Assets workspace or Asset Browser editor,"
-            text="then go to the Current Llibrary drop down and switch to the Default Library."
+            text="To access these defualt assets, switch to the Assets workspace or Asset Browser editor,")
+        layout.label(
+            text="then go to the Current Library drop down and switch to the Default Library.")
+        layout.label(
             text="You will now see new categories, assets and more.")
+
 
 def get_lib_path_index(prefs: Preferences):
     """Get the index of the library name or path for configuring them in the operator."""
