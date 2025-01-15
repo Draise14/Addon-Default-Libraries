@@ -23,6 +23,8 @@
 # -----------------------------------------------------------------------------
 
 import bpy
+import os
+
 from bpy.types import (
     AddonPreferences,
     Context,
@@ -34,13 +36,13 @@ from pathlib import Path
 from os import path as p
 
 bl_info = {
-    "name": "Bforartists Default Asset Library",
+    "name": "BFA - Default Asset Library",
     "author": "Draise",
-    "version": (1, 0, 0),
-    "blender": (3, 2, 1),
+    "version": (1, 0, 2),
+    "blender": (3, 6, 0),
     "location": "Asset Browser>Default Library",
     "description": "Adds a default library with complementary assets that you can use from the Asset Browser Editor",
-    "warning": "This is the first iteration of the default asset library. Expect changes. Use at own risk.",
+    "warning": "This is the second iteration of the default asset library. Expect changes. Use at own risk.",
     "doc_url": "https://github.com/Bforartists/Manual",
     "tracker_url": "https://github.com/Bforartists/Bforartists",
     # Please go to https://github.com/BlenderDefender/implement_addon_updater to implement support for automatic library updates:
@@ -48,12 +50,8 @@ bl_info = {
     "category": "Import-Export"
 }
 
-# Configure the display name of your Library here:
+# Configure the display name and sub-folder of your Library here:
 LIB_NAME = "Default Library"
-
-
-
-
 
 # Running code, don't change if not necessary!
 # -----------------------------------------------------------------------------
@@ -75,9 +73,9 @@ class LIBADDON_APT_preferences(AddonPreferences):
         layout.label(
             text="To access these defualt assets, switch to the Assets workspace or Asset Browser editor,")
         layout.label(
-            text="then go to the Current Library drop down and switch to the Default Library.")
+            text="Go to the Current Library drop down and switch to the Default Library.")
         layout.label(
-            text="You will now see new categories, assets and more.")
+            text="You will now see new categories, assets and more. Enjoy!")
 
 
 def get_lib_path_index(prefs: Preferences):
@@ -88,24 +86,27 @@ def get_lib_path_index(prefs: Preferences):
     return -1
 
 
-
-
 def register_library():
     """Register the library in Blender, as long as the addon is enabled."""
+
     prefs = bpy.context.preferences
 
     index = get_lib_path_index(prefs)
 
+    path = p.dirname(__file__)
+    sub_folder = LIB_NAME
+
+    full_path = os.path.join(path, sub_folder)
+
     # In case the library doesn't exist in the preferences, create it.
     if index == -1:
         bpy.ops.preferences.asset_library_add(
-            directory=p.dirname(__file__)+'\\Default Library\\')
+            directory=full_path)
         index = get_lib_path_index(prefs)
 
     # Set the correct name and path of the library to avoid issues because of wrong paths.
     prefs.filepaths.asset_libraries[index].name = LIB_NAME
-    prefs.filepaths.asset_libraries[index].path = p.dirname(__file__)+'\\Default Library\\'
-
+    prefs.filepaths.asset_libraries[index].path = full_path
     return
 
 
@@ -114,26 +115,25 @@ def unregister_library():
     prefs = bpy.context.preferences
 
     index = get_lib_path_index(prefs)
-    print(index)
 
     if index == -1:
         return
 
     bpy.ops.preferences.asset_library_remove(index=index)
-
+    print("Unregistered library")
 
 classes = (
     LIBADDON_APT_preferences,
 )
 
-
+#Registers the library when you load the addon.
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
 
     bpy.app.timers.register(register_library, first_interval=0.1)
 
-
+#Unregisters the library when you unload the addon.
 def unregister():
     unregister_library()
 
@@ -143,4 +143,4 @@ def unregister():
     try:
         bpy.app.timers.unregister(register_library)
     except Exception:
-        print("WARNING: Already unregistered register_library.")
+        pass
