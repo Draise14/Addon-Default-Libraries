@@ -17,447 +17,319 @@
 # ##### END GPL LICENSE BLOCK #####
 
 # -----------------------------------------------------------------------------
-# ! IMPORTANT! READ THIS WHEN SETTING UP THE LIBRARY
-# This is a work in progress, and many assets, categories, thumbnails and more are subject to change.
-# Use at own risk. 
+# Main Operations Module
+# This module serves as the central hub for all operations and panels
 # -----------------------------------------------------------------------------
 
 import bpy
+from bpy.types import Operator
 
+# Import operations from submodules
+from .operators.geometry_nodes import (
+    GN_ASSET_NAMES,
+    is_gn_asset_object,
+    get_all_gn_asset_objects
+)
 
-def get_geometry_nodes_inputs(modifier):
-    """Returns socket names and types for Geometry Nodes modifier inputs, excluding 'Geometry'.
-    Only works with Geometry Nodes modifiers - returns empty list for other modifier types."""
-    # First check if this is actually a Geometry Nodes modifier
-    if not hasattr(modifier, 'node_group') or modifier.type != 'NODES':
-        return []
-
-    # Then check if it has a node group
-    if not modifier.node_group:
-        return []
-    
-    inputs = []
-    # Get all interface items including panels
-    interface_items = modifier.node_group.interface.items_tree
-    
-    # Create a mapping of panel names to their child sockets
-    panel_map = {}
-    for item in interface_items:
-        if item.item_type == 'PANEL':
-            # Use name as key since identifier isn't available
-            panel_map[item.name] = {
-                'name': item.name,
-                'children': []
-            }
-    
-    # Process all items and organize by panels
-    for item in interface_items:
-        if item.item_type == 'SOCKET' and item.name != "Geometry":
-            socket_data = {
-                'name': item.name,
-                'identifier': item.identifier,  # Use actual identifier instead of name
-                'socket_type': item.socket_type,
-                'panel': None
-            }
-            
-            # If socket is in a panel, add to panel's children
-            if item.parent and item.parent.name in panel_map:
-                panel_map[item.parent.name]['children'].append(socket_data)
-            else:
-                # Add to root if no panel
-                inputs.append((socket_data['name'], socket_data['identifier'], 
-                             socket_data['socket_type'], None))
-    
-    # Add panel sockets in correct order
-    for panel_data in panel_map.values():
-        if panel_data['children']:
-            for child in panel_data['children']:
-                inputs.append((child['name'], child['identifier'], 
-                             child['socket_type'], panel_data['name']))
-    
-    return inputs
-
-
-
-class OBJECT_OT_ApplySmartPrimitives(bpy.types.Operator):
-    """Applies selected smart primitives, converts to mesh, joins them, and optionally remeshes"""
-    bl_idname = "object.apply_smart_primitives"
-    bl_label = "Apply Smart Primitives"
+class OBJECT_OT_ApplySelected(Operator):
+    """Apply selected objects and optionally join/remesh/boolean in one click"""
+    bl_idname = "object.apply_selected_objects"
+    bl_label = "Apply Selected Objects"
+    bl_description = "Converts objects to regular mesh objects with optional joining, remeshing and boolean operations"
     bl_options = {'REGISTER', 'UNDO'}
 
-    remesh: bpy.props.BoolProperty(
-        name="Remesh",
-        description="Apply quad remesh to the final mesh",
+    join_on_apply: bpy.props.BoolProperty(
+        name="Join on Apply",
+        description="Joins all applied objects into a single mesh object without changing geometry",
+        default=True
+    )
+
+    boolean_on_apply: bpy.props.BoolProperty(
+        name="Boolean on Apply",
+        description="Uses Float boolean union operations to combine applied objects into a single mesh object",
         default=False
     )
 
-    boolean: bpy.props.BoolProperty(
-        name="Boolean",
-        description="Apply boolean operation to combine the primitives",
+    remesh_on_apply: bpy.props.BoolProperty(
+        name="Remesh on Apply",
+        description="Creates Voxel-based remeshed mesh with custom resolution to combine applied obejcts into a single remeshed object",
         default=False
+    )
+    
+    voxel_size: bpy.props.FloatProperty(
+        name="Voxel Size",
+        description="Voxel size for the remeshing operation",
+        default=0.1,
+        min=0.005,
+        max=1.0,
+        step=0.01,
+        precision=3
     )
 
     @classmethod
     def poll(cls, context):
-        """Only enable if there are selected objects with smart primitive modifiers"""
-        if not context.selected_objects:
+        """Available if there are objects selected and only compatible types"""
+        selected_objects = context.selected_objects
+        if not selected_objects:
             return False
-            
-        for obj in context.selected_objects:
-            if obj.modifiers:
-                for mod in obj.modifiers:
-                    if (mod.type == 'NODES' and 
-                        mod.node_group and 
-                        mod.node_group.name in OBJECT_PT_GeometryNodesPanel.smart_primitive_names):
-                        return True
-        return False
-    
-    def execute(self, context):
-        # Store original active object and selection
-        original_active = context.view_layer.objects.active
-        original_selected = set(context.selected_objects)
         
-        # List to track objects we need to delete after conversion
+        # Check if all selected objects are compatible types
+        compatible_types = {'MESH', 'CURVE', 'SURFACE', 'FONT', 'META'}
+        for obj in selected_objects:
+            if obj.type not in compatible_types:
+                return False
+        
+        return True
+
+    def execute(self, context):
+        selected_objects = context.selected_objects
+        
+        if not selected_objects:
+            self.report({'WARNING'}, "No objects found to process")
+            return {'CANCELLED'}
+
         objects_to_delete = []
         new_objects = []
         
         try:
-            # First pass: Collect all objects with smart primitives and mesh objects
-            smart_objects = []
-            for obj in context.selected_objects:
-                # Add mesh objects
-                if obj.type == 'MESH':
-                    smart_objects.append(obj)
-                    continue
-                
-                # Add objects with smart primitive modifiers
-                if obj.modifiers:
-                    for mod in obj.modifiers:
-                        if (mod.type == 'NODES' and 
-                            mod.node_group and 
-                            mod.node_group.name in OBJECT_PT_GeometryNodesPanel.smart_primitive_names):
-                            smart_objects.append(obj)
-                            break
-            
-            if not smart_objects:
-                self.report({'WARNING'}, "No valid objects found to process")
-                return {'CANCELLED'}
-            
-            # Convert all smart objects to mesh in one operation
+            # Convert all selected objects to mesh
             bpy.ops.object.select_all(action='DESELECT')
-            for obj in smart_objects:
+            for obj in selected_objects:
                 obj.select_set(True)
                 objects_to_delete.append(obj)
             
-            context.view_layer.objects.active = smart_objects[0]
+            context.view_layer.objects.active = selected_objects[0]
             bpy.ops.object.visual_geometry_to_objects()
             
-            # Get newly created objects
+            # Get newly created mesh objects
             current_selected = set(context.selected_objects)
+            original_selected = set(objects_to_delete)
             new_objects = [obj for obj in current_selected if obj not in original_selected]
             
-            # Join all new objects
-            if new_objects:                               
-                # Apply boolean operation if enabled
-                if self.boolean and new_objects:
-                    # Start with the first object as our base
+            final_object = None
+            
+            if new_objects:
+                if self.boolean_on_apply:
+                    # Boolean union operation
                     base_object = new_objects[0]
                     base_object.select_set(True)
                     context.view_layer.objects.active = base_object
 
-                    # Store the other objects to delete them later
                     objects_to_bool = new_objects[1:]
-                    objects_to_delete.extend(objects_to_bool)  # Add these to our cleanup list
+                    objects_to_delete.extend(objects_to_bool)
 
-                    # Iterate through remaining objects
-                    for obj in objects_to_bool:
-                        # Verify object still exists before processing
-                        if obj and obj.name in context.scene.objects:
-                            # Add boolean modifier to base object
-                            bool_mod = base_object.modifiers.new(name="Boolean", type='BOOLEAN')
-                            bool_mod.operation = 'UNION'
-                            bool_mod.solver = 'FAST'  # Using FAST solver for better performance
-                            bool_mod.object = obj
-                            
-                            # Apply the modifier
-                            try:
-                                bpy.ops.object.modifier_apply(modifier=bool_mod.name)
-                            except RuntimeError as e:
-                                print(f"Boolean operation failed on {obj.name}: {str(e)}")
-                                continue
-                            
-                            # Update the scene to ensure proper selection
-                            context.view_layer.update()
-                            
-                            # Select only the base object
-                            bpy.ops.object.select_all(action='DESELECT')
-                            base_object.select_set(True)
-                            context.view_layer.objects.active = base_object
-                            
-                            bpy.ops.object.shade_auto_smooth()
+                    if len(new_objects) > 1:
+                        for obj in objects_to_bool:
+                            if obj and obj.name in context.scene.objects:
+                                bool_mod = base_object.modifiers.new(name="Boolean", type='BOOLEAN')
+                                bool_mod.operation = 'UNION'
+                                bool_mod.solver = 'FLOAT'
+                                bool_mod.object = obj
+                                
+                                try:
+                                    bpy.ops.object.modifier_apply(modifier=bool_mod.name)
+                                except RuntimeError as e:
+                                    print(f"Boolean operation failed: {str(e)}")
+                                    continue
+                                
+                                context.view_layer.update()
+                                
+                                bpy.ops.object.select_all(action='DESELECT')
+                                base_object.select_set(True)
+                                context.view_layer.objects.active = base_object
                     
-                    # Update final_object reference
                     final_object = base_object
-            
-                else:
-                    # Simple join operation if boolean is disabled
-                    if context.scene.join_apply:
+                
+                elif self.join_on_apply and len(new_objects) > 1:
+                    # Simple join operation
+                    context.view_layer.objects.active = new_objects[0]
+                    for obj in new_objects:
+                        obj.select_set(True)
+                    bpy.ops.object.join()
+                    final_object = context.view_layer.objects.active
+
+                elif self.remesh_on_apply:
+                    # First join the new objects
+                    if len(new_objects) > 1:
                         context.view_layer.objects.active = new_objects[0]
                         for obj in new_objects:
                             obj.select_set(True)
                         bpy.ops.object.join()
-                        
-                        # Get the final joined object
-                        final_object = context.view_layer.objects.active
-                    else:
-                        # If join is disabled, just use the first object
-                        final_object = new_objects[0]
                     
-                   
+                    final_object = context.view_layer.objects.active
+
+                    # Ensure the final object is properly processed before remeshing
+                    bpy.ops.object.select_all(action='DESELECT')
+                    final_object.select_set(True)
+                    context.view_layer.objects.active = final_object
+                    
+                    # Convert to mesh if it's not already a mesh (safety check)
+                    if final_object.type != 'MESH':
+                        try:
+                            bpy.ops.object.convert(target='MESH')
+                        except:
+                            #print(f"Warning: Could not convert {final_object.type} to mesh for remeshing")
+                            pass
+                    
+                    # Make sure the object has valid mesh data
+                    if not final_object.data or not hasattr(final_object.data, 'polygons'):
+                        try:
+                            bpy.ops.object.convert(target='MESH')
+                        except:
+                            #print(f"Error: Invalid mesh data for remeshing")
+                            final_object = None
+                            pass
+                    
+                    if final_object:
+                        # Add a remesh modifier with the specified voxel size
+                        remesh_mod = final_object.modifiers.new(name="TempRemesh", type='REMESH')
+                        remesh_mod.mode = 'VOXEL'
+                        remesh_mod.voxel_size = self.voxel_size
+                        
+                        # Set smooth shading for better results
+                        remesh_mod.use_smooth_shade = True
+                        
+                        # Ensure proper selection and context for modifier application
+                        bpy.ops.object.select_all(action='DESELECT')
+                        final_object.select_set(True)
+                        context.view_layer.objects.active = final_object
+                        context.view_layer.update()
+                        
+                        # Apply the modifier with robust error handling
+                        try:
+                            # Make sure modifier is valid and object is selected
+                            if remesh_mod.name in final_object.modifiers:
+                                # Apply the modifier via bpy.ops
+                                bpy.ops.object.modifier_apply(modifier=remesh_mod.name, report=True)
+                                #print(f"✓ Successfully applied remesh with voxel size: {self.voxel_size}")
+                            else:
+                                #print("⚠ Remesh modifier was not properly created")
+                                pass
+                        except RuntimeError as e:
+                            #print(f"⚠ Remesh operation failed: {str(e)}")
+                            
+                            # Clean up the modifier if it couldn't be applied
+                            if remesh_mod.name in final_object.modifiers:
+                                final_object.modifiers.remove(remesh_mod)
+                            
+                            # Fallback: Try creating the modifier again with different approach
+                            try:
+                                remesh_mod2 = final_object.modifiers.new(name="RemeshFallback", type='REMESH')
+                                remesh_mod2.mode = 'VOXEL'
+                                remesh_mod2.voxel_size = self.voxel_size
+                                remesh_mod2.use_smooth_shade = True
+                                
+                                bpy.ops.object.modifier_apply(modifier=remesh_mod2.name)
+                                #print(f"✓ Fallback remesh applied successfully")
+                            except:
+                                pass
+                                #print("⚠ Fallback remesh also failed")
+                        
+                        # Final cleanup and selection
+                        context.view_layer.update()
+                        bpy.ops.object.select_all(action='DESELECT')
+                        final_object.select_set(True)
+                        context.view_layer.objects.active = final_object
+
+                    # DEBUG:
+                    #self.report({'INFO'}, f"Applied remesh with voxel size: {self.voxel_size}")
+                    
+                else:
+                    final_object = new_objects[0]
+
             # Clean up original objects
             bpy.ops.object.select_all(action='DESELECT')
             for obj in objects_to_delete:
                 if obj and obj.name in context.scene.objects:
                     obj.select_set(True)
-            bpy.ops.object.delete()
-                                   
-            # Select the final object and make it active
+                bpy.ops.object.delete()
+            
+            # Select final object
             if final_object and final_object.name in context.scene.objects:
                 bpy.ops.object.select_all(action='DESELECT')
                 final_object.select_set(True)
                 context.view_layer.objects.active = final_object
-    
-                # Enter edit mode, select all, clear sharp edges, and return to object mode
-                bpy.ops.object.mode_set(mode='EDIT')
-                bpy.ops.mesh.select_all(action='SELECT')
-                bpy.ops.mesh.mark_sharp(clear=True)
-                bpy.ops.object.mode_set(mode='OBJECT')
             
-            self.report({'INFO'}, f"Successfully applied {len(smart_objects)} primitives")
+            # DEBUG:
+            #self.report({'INFO'}, f"Applied {len(selected_objects)} objects")
             return {'FINISHED'}
             
         except Exception as e:
             self.report({'ERROR'}, f"Error during operation: {str(e)}")
-            # Try to restore original state
-            if original_active and original_active.name in context.scene.objects:
-                context.view_layer.objects.active = original_active
             return {'CANCELLED'}
 
 
-class OBJECT_PT_GeometryNodesPanel(bpy.types.Panel):
-    """Panel in the sidebar for editing Geometry Nodes properties."""
-    bl_idname = "OBJECT_PT_geometry_nodes_panel"
-    bl_label = "Primitive Properties"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_category = "Item"
 
-    show_panel = True  # Controls whether the panel should be shown
+# -----------------------------------------------------------------------------
+# Registration
+# -----------------------------------------------------------------------------
 
-    smart_primitive_names = [
-        "Smart Capsule",
-        "Smart Capsule Revolved",
-        "Smart Circle",
-        "Smart Circle Revolved",
-        "Smart Cone",
-        "Smart Cone Rounded",
-        "Smart Cone Rounded Revolved",
-        "Smart Cube",
-        "Smart Cube Rounded",
-        "Smart Curve Lofted",
-        "Smart Cylinder",
-        "Smart Cylinder Rounded Revolved",
-        "Smart Grid",
-        "Smart Icosphere",
-        "Smart Sphere",
-        "Smart Sphere Revolved",
-        "Smart Spiral",
-        "Smart Torus",
-        "Smart Tube Revolved",
-        "Smart Tube Rounded Revolved"
-    ]
-    
-    
-    @classmethod
-    def poll(cls, context):
-        """Only show panel for objects with Geometry Nodes modifiers from our smart primitives list."""
-        if not cls.show_panel or not context.object or not context.object.modifiers:
-            return False
-            
-        # Check if any modifier is a Geometry Nodes modifier with a node group in our list
-        for mod in context.object.modifiers:
-            if (mod.type == 'NODES' and 
-                mod.node_group and 
-                mod.node_group.name in cls.smart_primitive_names):
-                return True
-        return False
+classes = (
+    OBJECT_OT_ApplySelected,
+)
 
-    def draw(self, context):
-        layout = self.layout
-        obj = context.object
-        
-        # Find the first Geometry Nodes modifier that matches our primitive names
-        mod = next((m for m in obj.modifiers 
-                   if m.type == 'NODES' and 
-                   m.node_group and 
-                   m.node_group.name in self.smart_primitive_names), None)
-
-        if mod and mod.node_group:
-            # Main panel header
-            layout.label(text=f"{mod.node_group.name}", icon='NODETREE')
-            
-            # Get and display all inputs
-            inputs = get_geometry_nodes_inputs(mod)
-            
-            # Track current panel to group sockets together
-            current_panel = None
-            panel_box = None
-            
-            for socket_name, socket_id, socket_type, parent_panel in inputs:
-                # If we've moved to a new panel, create a new box
-                if parent_panel != current_panel:
-                    if panel_box:  # Close previous panel if it exists
-                        panel_box.separator()
-                    current_panel = parent_panel
-                    if current_panel:
-                        panel_box = layout.box()
-                        panel_box.label(text=current_panel, icon='NODE')
-                
-                # If we're in a panel, use the panel_box layout
-                target_layout = panel_box if current_panel else layout
-                
-                # Create a row for each input to ensure proper layout
-                row = target_layout.row()
-                
-                # Handle different socket types
-                if socket_type == 'BOOLEAN':
-                    row.prop(mod, f'["{socket_id}"]', text=socket_name, toggle=True)
-                elif socket_type == 'VALUE':
-                    # Split row into label and slider
-                    row.label(text=socket_name)
-                    row.prop(mod, f'["{socket_id}"]', text="", slider=False)
-                else:
-                    row.prop(mod, f'["{socket_id}"]', text=socket_name)
-
-            # Add the apply button with proper spacing
-            layout.separator()
-            row = layout.row()
-            row.scale_y =  1.5 # Make the button larger
-            op = row.operator("object.apply_smart_primitives", text="Apply Selected Primitives", icon='CHECKMARK')
-            op.remesh = context.scene.join_apply
-            op.boolean = context.scene.boolean_apply
-
-            # Add a toggle button for the remesh property
-            row = layout.row()
-            row.prop(context.scene, "join_apply", text="Join on Apply")
-
-            # Add a toggle button for the boolean property
-            row = layout.row()
-            row.prop(context.scene, "boolean_apply", text="Boolean on Apply")
-
-
-##### Modifiers Panel Operators ####
-
-class OBJECT_PT_SmartPrimitiveModifierPanel(bpy.types.Panel):
-    """Creates a custom panel in the Modifier properties for Smart Primitives"""
-    bl_label = "Smart Primitive Operators"
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context = "modifier"
-    bl_parent_id = 'DATA_PT_modifiers'
-
-    @classmethod
-    def poll(cls, context):
-        # Show panel if any Smart Primitive modifier exists in the stack
-        if context.object and context.object.modifiers:
-            # Check all modifiers in the stack
-            for mod in context.object.modifiers:
-                if (mod.type == 'NODES' and
-                    mod.node_group and
-                    mod.node_group.name in OBJECT_PT_GeometryNodesPanel.smart_primitive_names):
-                    return True
-        return False
-
-    def draw(self, context):
-        layout = self.layout
-        obj = context.object
-        mod = obj.modifiers.active
-        
-        # Get and display all inputs
-        inputs = get_geometry_nodes_inputs(mod)
-        
-        # Add the apply button with proper spacing
-        layout.separator()
-        row = layout.row()
-        row.scale_y = 1.5 # Make the button larger
-        op = row.operator("object.apply_smart_primitives", text="Apply Selected Primitives", icon='CHECKMARK')
-        op.remesh = context.scene.join_apply
-        op.boolean = context.scene.boolean_apply
-
-        # Add a toggle button for the remesh property
-        row = layout.row()
-        row.prop(context.scene, "join_apply", text="Join on Apply")
-
-        # Add a toggle button for the boolean property
-        row = layout.row()
-        row.prop(context.scene, "boolean_apply", text="Boolean on Apply")
-
-
-def object_added_handler(scene):
-    """Activates the panel when an object with Geometry Nodes is added to the scene."""
-    for obj in scene.objects:
-        if obj not in object_added_handler.known_objects:
-            # Only activate panel for our specific primitives
-            mod = next((m for m in obj.modifiers 
-                       if m.type == 'NODES' and 
-                       m.node_group and 
-                       m.node_group.name in OBJECT_PT_GeometryNodesPanel.smart_primitive_names), None)
-            if mod:
-                OBJECT_PT_GeometryNodesPanel.show_panel = True
-            object_added_handler.known_objects.add(obj)
-
-object_added_handler.known_objects = set()
-
-
-##### Register #####
-
+# Register scene properties and operators
 def register():
-    # Register the bool property first
+    """Register all operator classes."""
+    # Register scene properties
     bpy.types.Scene.join_apply = bpy.props.BoolProperty(
-        name="Join",
-        description="Apply quad remesh to the final mesh",
-        default=False
+        name="Join on Apply",
+        description="Join converted objects into a single mesh",
+        default=True
     )
-    
-    # Register the bool property first
-    bpy.types.Scene.boolean_apply = bpy.props.BoolProperty(
-        name="Boolean",
-        description="Apply boolean to the final mesh",
-        default=False
-    )
-    
-    # Then register the classes and handler
-    bpy.utils.register_class(OBJECT_PT_GeometryNodesPanel)
-    bpy.utils.register_class(OBJECT_OT_ApplySmartPrimitives)
-    bpy.utils.register_class(OBJECT_PT_SmartPrimitiveModifierPanel)
 
-    # Add handler only if it's not already there
-    if object_added_handler not in bpy.app.handlers.depsgraph_update_post:
-        bpy.app.handlers.depsgraph_update_post.append(object_added_handler)
+    bpy.types.Scene.boolean_apply = bpy.props.BoolProperty(
+        name="Boolean on Apply",
+        description="Apply a boolean union operation to combine objects into a single mesh",
+        default=False
+    )
+
+    bpy.types.Scene.remesh_apply = bpy.props.BoolProperty(
+        name="Remesh on Apply",
+        description="Apply a remesh union operation to combine objects into a single mesh",
+        default=False
+    )
+
+    bpy.types.Scene.voxel_size_apply = bpy.props.FloatProperty(
+        name="Voxel Size",
+        description="Voxel size for remeshing operation",
+        default=0.1,
+        min=0.005,
+        max=1.0,
+        step=0.01,
+        precision=3
+    )
+
+    from bpy.utils import register_class
+    for cls in classes:
+        try:
+            register_class(cls)
+        except ValueError as e:
+            if "already registered" not in str(e):
+                print(f"⚠ Error registering {cls.__name__}: {e}")
+
 
 def unregister():
-    # Unregister in reverse order
-    bpy.utils.unregister_class(OBJECT_PT_GeometryNodesPanel)
-    bpy.utils.unregister_class(OBJECT_OT_ApplySmartPrimitives)
-    bpy.utils.unregister_class(OBJECT_PT_SmartPrimitiveModifierPanel)
+    """Unregister all operator classes."""
+    # Remove scene properties first
+    try:
+        del bpy.types.Scene.join_apply
+        del bpy.types.Scene.boolean_apply
+        del bpy.types.Scene.remesh_apply
+        del bpy.types.Scene.voxel_size_apply
+    except:
+        pass
     
-    # Remove handler if it exists
-    if object_added_handler in bpy.app.handlers.depsgraph_update_post:
-        bpy.app.handlers.depsgraph_update_post.remove(object_added_handler)
+    from bpy.utils import unregister_class
+    for cls in reversed(classes):
+        try:
+            unregister_class(cls)
+        except RuntimeError as e:
+            if "not registered" not in str(e):
+                print(f"⚠ Error unregistering {cls.__name__}: {e}")
+        except Exception as e:
+            print(f"⚠ Error unregistering {cls.__name__}: {e}")
 
-    # Finally, remove the property
-    del bpy.types.Scene.join_apply
-    del bpy.types.Scene.boolean_apply
 
 if __name__ == "__main__":
     register()
