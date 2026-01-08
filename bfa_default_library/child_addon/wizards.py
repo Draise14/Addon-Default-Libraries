@@ -16,16 +16,26 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-"""
-Compositor Operators - Parent Addon Version
-This file is intentionally empty in the parent addon.
-All functional compositor operators are in the child addon.
-"""
+# -----------------------------------------------------------------------------
+# Wizard Main Module
+# Main entry point that imports and registers all wizard components
+# -----------------------------------------------------------------------------
+
+import bpy
+
+# Import wizard components
+from . import wizard_operators
+from . import wizard_handlers
 
 def register():
-    """Empty register function for parent addon."""
-    pass
+    """Register all wizard components."""
+    wizard_operators.register()
+    wizard_handlers.register()
 
 def unregister():
-    """Empty unregister function for parent addon."""
-    pass
+    """Unregister all wizard components."""
+    wizard_handlers.unregister()
+    wizard_operators.unregister()
+
+if __name__ == "__main__":
+    register()

@@ -16,26 +16,16 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-# -----------------------------------------------------------------------------
-# Wizard Main Module
-# Main entry point that imports and registers all wizard components
-# -----------------------------------------------------------------------------
-
-import bpy
-
-# Import wizard components
-from . import wizard_operators
-from . import wizard_handlers
+"""
+Wizards Module - Parent Addon Version
+This file is intentionally empty in the parent addon.
+All functional wizards are in the child addon.
+"""
 
 def register():
-    """Register all wizard components."""
-    wizard_operators.register()
-    wizard_handlers.register()
+    """Empty register function for parent addon."""
+    pass
 
 def unregister():
-    """Unregister all wizard components."""
-    wizard_handlers.unregister()
-    wizard_operators.unregister()
-
-if __name__ == "__main__":
-    register()
+    """Empty unregister function for parent addon."""
+    pass

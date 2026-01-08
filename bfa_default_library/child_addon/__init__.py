@@ -17,15 +17,22 @@
 # ##### END GPL LICENSE BLOCK #####
 
 """
-Compositor Operators - Parent Addon Version
-This file is intentionally empty in the parent addon.
-All functional compositor operators are in the child addon.
+Default Asset Library Child Module
+This is a module that contains all operators, panels, handlers, and wizards.
+It's loaded directly by the parent addon, not as a separate addon.
+
+This file should be empty or contain minimal code since the parent addon
+handles all module loading and registration.
 """
 
-def register():
-    """Empty register function for parent addon."""
-    pass
+# No imports or registration here - handled by parent addon
+# This file exists so Python recognizes this as a package
 
+# Placeholder functions that do nothing - actual registration is handled by parent
+def register():
+    """Placeholder - registration handled by parent addon."""
+    pass
+    
 def unregister():
-    """Empty unregister function for parent addon."""
+    """Placeholder - unregistration handled by parent addon."""
     pass

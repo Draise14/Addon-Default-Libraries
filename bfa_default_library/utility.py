@@ -40,9 +40,6 @@ def get_addon_identifier(addon_info):
 def get_bforartists_user_preferences_folder():
     """Get the Bforartists user preferences folder for the current version."""
     try:
-        import bpy
-        from pathlib import Path
-        
         # Get the user resource path (already includes the version, e.g., .../Bforartists/5.1/)
         user_path = Path(bpy.utils.resource_path("USER"))
         # Place libraries directly in the version-specific user folder under "asset_libraries"
@@ -54,10 +51,6 @@ def get_bforartists_user_preferences_folder():
         
         # If bpy.utils.resource_path fails, construct the path manually
         try:
-            import bpy
-            import sys
-            from pathlib import Path
-            
             # Get Bforartists version
             version_str = f"{bpy.app.version[0]}.{bpy.app.version[1]}"
             
@@ -85,6 +78,67 @@ def get_bforartists_user_preferences_folder():
             print(f"⚠ Could not construct user preferences path: {e2}")
             # If everything fails, raise the original error
             raise e
+
+
+def get_user_preferences_path():
+    """Get the main user preferences path for addon files."""
+    try:
+        import bpy
+        from pathlib import Path
+        
+        # Get the user resource path (already includes the version, e.g., .../Bforartists/5.1/)
+        user_path = Path(bpy.utils.resource_path("USER"))
+        
+        return str(user_path)
+    except Exception as e:
+        print(f"⚠ Could not get user resource path: {e}")
+        
+        # Fallback to the same logic as get_bforartists_user_preferences_folder
+        try:
+            import bpy
+            import sys
+            from pathlib import Path
+            
+            # Get Bforartists version
+            version_str = f"{bpy.app.version[0]}.{bpy.app.version[1]}"
+            
+            # Platform-specific user preferences paths
+            if sys.platform == "win32":
+                # Windows: %APPDATA%\Bforartists\Bforartists\{version}
+                appdata = os.getenv('APPDATA')
+                if appdata:
+                    user_path = Path(appdata) / "Bforartists" / "Bforartists" / version_str
+                    return str(user_path)
+            elif sys.platform == "darwin":
+                # macOS: ~/Library/Application Support/Bforartists/Bforartists/{version}
+                home = Path.home()
+                user_path = home / "Library" / "Application Support" / "Bforartists" / "Bforartists" / version_str
+                return str(user_path)
+            else:
+                # Linux and others: ~/.config/bforartists/{version}
+                home = Path.home()
+                user_path = home / ".config" / "bforartists" / version_str
+                return str(user_path)
+        except Exception as e2:
+            print(f"⚠ Could not construct user preferences path: {e2}")
+            # Default to current directory if everything fails
+            return os.getcwd()
+
+
+def get_bfa_extensions_path():
+    """Get the Bforartists extensions path where addons should be installed."""
+    user_prefs_path = get_user_preferences_path()
+    extensions_path = os.path.join(user_prefs_path, "extensions", "user_default")
+    # Ensure the directory exists
+    os.makedirs(extensions_path, exist_ok=True)
+    return extensions_path
+
+
+def get_child_addon_path(child_addon_name="modular_child_addons"):
+    """Get the path where child addons should be stored in Bforartists extensions."""
+    extensions_path = get_bfa_extensions_path()
+    child_addon_path = os.path.join(extensions_path, child_addon_name)
+    return child_addon_path
 
 
 def get_central_library_path():
@@ -385,6 +439,115 @@ def remove_orphaned_files(central_lib_base, tracking_data, files_to_check):
                 print(f"      ⚠ Could not remove file {file_path}: {e}")
 
     return removed_count
+
+
+def get_child_addon_status(child_addon_name="modular_child_addons"):
+    """
+    Get the installation and activation status of a child addon.
+    
+    Returns:
+        tuple: (is_installed, is_active, addon_path)
+    """
+    import bpy
+    
+    # Get the Bforartists extensions path
+    child_addon_dir = get_child_addon_path(child_addon_name)
+    child_init_file = os.path.join(child_addon_dir, "__init__.py")
+    
+    # Check if installed
+    is_installed = os.path.exists(child_init_file)
+    
+    # Check if active - try multiple possible module names
+    is_active = False
+    # Try the exact name first
+    if child_addon_name in bpy.context.preferences.addons:
+        is_active = True
+    else:
+        # Also check for the module name without any path components
+        module_name = child_addon_name
+        if module_name in bpy.context.preferences.addons:
+            is_active = True
+    
+    return is_installed, is_active, child_addon_dir
+
+
+def create_child_addon_manifest(child_addon_name, parent_addon_info):
+    """
+    Create a manifest file for tracking child addon installation.
+    
+    Args:
+        child_addon_name: Name of the child addon
+        parent_addon_info: Dictionary with parent addon info
+    """
+    child_addon_dir = get_child_addon_path(child_addon_name)
+    manifest_file = os.path.join(child_addon_dir, ".child_addon_manifest.json")
+    
+    manifest_data = {
+        'child_addon_name': child_addon_name,
+        'parent_addon_id': get_addon_identifier(parent_addon_info),
+        'parent_addon_name': parent_addon_info.get('name', ''),
+        'parent_addon_version': parent_addon_info.get('version', []),
+        'installation_timestamp': os.path.getmtime(__file__) if os.path.exists(__file__) else None
+    }
+    
+    os.makedirs(child_addon_dir, exist_ok=True)
+    with open(manifest_file, 'w') as f:
+        json.dump(manifest_data, f, indent=2)
+    
+    return manifest_file
+
+
+def read_child_addon_manifest(child_addon_name="modular_child_addons"):
+    """Read the child addon manifest file."""
+    child_addon_dir = get_child_addon_path(child_addon_name)
+    manifest_file = os.path.join(child_addon_dir, ".child_addon_manifest.json")
+    
+    if not os.path.exists(manifest_file):
+        return None
+    
+    try:
+        with open(manifest_file, 'r') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return None
+
+
+def remove_child_addon_manifest(child_addon_name="modular_child_addons"):
+    """Remove the child addon manifest file."""
+    child_addon_dir = get_child_addon_path(child_addon_name)
+    manifest_file = os.path.join(child_addon_dir, ".child_addon_manifest.json")
+    
+    if os.path.exists(manifest_file):
+        try:
+            os.remove(manifest_file)
+            return True
+        except OSError:
+            return False
+    return True
+
+
+def get_child_addons_by_parent(parent_addon_id):
+    """Get all child addons installed by a specific parent addon."""
+    extensions_path = get_bfa_extensions_path()
+    child_addons = []
+    
+    if not os.path.exists(extensions_path):
+        return child_addons
+    
+    for item in os.listdir(extensions_path):
+        child_dir = os.path.join(extensions_path, item)
+        if os.path.isdir(child_dir):
+            manifest_file = os.path.join(child_dir, ".child_addon_manifest.json")
+            if os.path.exists(manifest_file):
+                try:
+                    with open(manifest_file, 'r') as f:
+                        manifest_data = json.load(f)
+                        if manifest_data.get('parent_addon_id') == parent_addon_id:
+                            child_addons.append(item)
+                except (json.JSONDecodeError, IOError):
+                    continue
+    
+    return child_addons
 
 
 # Dummy register/unregister functions to prevent errors if accidentally called as submodule

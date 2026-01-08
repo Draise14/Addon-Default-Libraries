@@ -5,15 +5,15 @@ schema_version = "2.0.0"
 # Example of manifest file for a Blender extension
 # Change the values according to your extension
 
-id = "smart_mesh_blend"
-name = "Smart Mesh Blend"
+id = "bfa_default_library"
+name = "Default Asset Library"
 version = "2.0.0"
 blender_version_min = "4.4.0"
 author = "Andres (Draise) Stephens"
 maintainer = "Andres (Draise) Stephens"
-tagline = "An asset library with a Blend Normals by Proximity"
+tagline = "A default asset library"
 type = "add-on"
-description = "Adds a Blend Normals and Materials by Proximity asset with a wizard to apply normal and material blending and intersection displacement on a collection of objects"
+description = "Adds a default asset library and addon with wizards and complementary operators"
 license = ["SPDX:GPL-3.0-or-later",]
 repository = "https://github.com/Bforartists/Bforartists"
 
