@@ -179,7 +179,9 @@ def activate_child_addon():
     
     # Load the child addon functionality
     if load_child_addon_functionality():
-        print("✅ Child addon functionality loaded")
+        # Add this parent to tracking (since we're manually loading)
+        add_parent_to_child_tracking()
+        print("✅ Child addon functionality loaded and tracking updated")
         return True
     else:
         print("❌ Failed to load child addon functionality")
@@ -189,7 +191,23 @@ def activate_child_addon():
 def deactivate_child_addon():
     """Deactivate the child addon by unloading its functionality."""
     print("🔄 Unloading child addon functionality...")
-    return unload_child_addon_functionality()
+    
+    # First check if other parents would still be active after we remove
+    tracking_data = get_child_addon_tracking_data()
+    other_parents_active = len([p for p in tracking_data["active_parents"] if p != PARENT_ADDON_UNIQUE_ID])
+    
+    # Try to unload (will return True if already unloaded or if other parents are active)
+    if unload_child_addon_functionality(force=False):
+        # Remove this parent from tracking (since we're manually unloading)
+        remove_parent_from_child_tracking()
+        if other_parents_active > 0:
+            print(f"✅ Child addon functionality kept loaded for {other_parents_active} other parent(s)")
+        else:
+            print("✅ Child addon functionality unloaded and tracking updated")
+        return True
+    else:
+        print("❌ Failed to unload child addon functionality")
+        return False
 
 
 def remove_child_addon_from_user_prefs():
@@ -219,11 +237,17 @@ def is_child_addon_installed():
 def is_child_addon_active():
     """
     Check if child addon functionality is loaded.
-    Since we're not actually activating a separate addon anymore,
-    we need a different way to track if functionality is loaded.
     
-    For now, we'll check if the child addon modules are in sys.modules.
+    We check both:
+    1. The tracking data (which should be accurate if everyone follows the protocol)
+    2. sys.modules (as a fallback if tracking data is wrong)
     """
+    # First check tracking data (primary source of truth)
+    tracking_data = get_child_addon_tracking_data()
+    if tracking_data["is_functionality_loaded"]:
+        return True
+    
+    # Fallback: Check sys.modules
     child_addon_name = "modular_child_addons"
     
     # Check if any of the child addon modules are loaded
@@ -235,6 +259,8 @@ def is_child_addon_active():
     for module_name in sys.modules:
         for prefix in module_prefixes:
             if module_name.startswith(prefix):
+                # Found a module from our child addon
+                print(f"⚠ Child addon module found in sys.modules but tracking says not loaded: {module_name}")
                 return True
     
     # Also check for direct module names
@@ -255,9 +281,20 @@ def is_child_addon_active():
             if hasattr(module_obj, '__file__'):
                 filepath = module_obj.__file__
                 if filepath and 'modular_child_addons' in filepath:
+                    print(f"⚠ Child addon module found in sys.modules but tracking says not loaded: {module}")
                     return True
     
     return False
+
+
+def is_child_addon_enabled_for_this_parent():
+    """
+    Check if child addon functionality is enabled for THIS specific parent.
+    This is different from is_child_addon_active() which checks if functionality
+    is loaded globally.
+    """
+    tracking_data = get_child_addon_tracking_data()
+    return PARENT_ADDON_UNIQUE_ID in tracking_data["active_parents"]
 
 
 def get_child_addon_tracking_data():
@@ -361,6 +398,20 @@ def ensure_child_addon_installed():
 def load_child_addon_functionality():
     """Load and register child addon functionality directly."""
     try:
+        # First check if functionality is already loaded
+        tracking_data = get_child_addon_tracking_data()
+        if tracking_data["is_functionality_loaded"]:
+            print("✓ Child addon functionality already loaded")
+            
+            # Still add this parent to tracking even if already loaded
+            if PARENT_ADDON_UNIQUE_ID not in tracking_data["active_parents"]:
+                tracking_data["active_parents"].append(PARENT_ADDON_UNIQUE_ID)
+                tracking_data["last_activated_by"] = PARENT_ADDON_UNIQUE_ID
+                save_child_addon_tracking_data(tracking_data)
+                print(f"✓ Added {PARENT_ADDON_DISPLAY_NAME} to active parents")
+            
+            return True
+        
         # Get child addon path
         child_addon_dir = get_child_addon_path()
         
@@ -452,6 +503,8 @@ def load_child_addon_functionality():
             # Update tracking data
             tracking_data = get_child_addon_tracking_data()
             tracking_data["is_functionality_loaded"] = True
+            if PARENT_ADDON_UNIQUE_ID not in tracking_data["active_parents"]:
+                tracking_data["active_parents"].append(PARENT_ADDON_UNIQUE_ID)
             tracking_data["last_activated_by"] = PARENT_ADDON_UNIQUE_ID
             save_child_addon_tracking_data(tracking_data)
             
@@ -742,7 +795,7 @@ def register_library(force_reregister=False):
     if force_reregister and already_tracked:
         print(f"🔄 Forcing re-registration of tracked parent addon: {addon_id}")
         del tracking_data[addon_id]
-        utility.save_addon_tracking(central_base, tracking_data)
+        utility.write_addon_tracking(central_base, tracking_data)
         already_tracked = False
     
     # Smart cleanup - update existing libraries to correct paths
@@ -928,37 +981,7 @@ class LIBADDON_OT_readd_libraries(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class LIBADDON_OT_manage_child_addon(bpy.types.Operator):
-    """Manage the child addon functionality"""
-    bl_idname = "preferences.libaddon_manage_child_addon"
-    bl_label = "Manage Child Addon"
-    bl_description = "Load or unload the functional child addon components"
-    bl_options = {'REGISTER', 'INTERNAL'}
-    
-    action: bpy.props.EnumProperty(
-        name="Action",
-        description="Action to perform on child addon",
-        items=[
-            ('INSTALL', "Load Functionality", "Load child addon functionality"),
-            ('DEACTIVATE', "Unload Functionality", "Unload child addon functionality"),
-        ],
-        default='INSTALL'
-    )
-    
-    def execute(self, context):
-        if self.action == 'INSTALL':
-            if activate_child_addon():
-                self.report({'INFO'}, "Child addon functionality loaded")
-            else:
-                self.report({'ERROR'}, "Failed to load child addon functionality")
-        
-        elif self.action == 'DEACTIVATE':
-            if deactivate_child_addon():
-                self.report({'INFO'}, "Child addon functionality unloaded")
-            else:
-                self.report({'ERROR'}, "Failed to unload child addon functionality")
-        
-        return {'FINISHED'}
+
 
 
 # -----------------------------------------------------------------------------
@@ -1004,17 +1027,11 @@ class LIBADDON_APT_preferences(AddonPreferences):
         # Child addon management buttons
         box.separator()
         box.label(text="Child Addon Management:", icon='TOOL_SETTINGS')
-        
-        row = box.row(align=True)
-        op = row.operator("preferences.libaddon_manage_child_addon", 
-                         text="Load Functionality", 
-                         icon='ADD')
-        op.action = 'INSTALL'
-        
-        op = row.operator("preferences.libaddon_manage_child_addon", 
-                         text="Unload Functionality", 
-                         icon='PANEL_CLOSE')
-        op.action = 'DEACTIVATE'
+
+            
+            # Show note about what this does
+            row = box.row()
+            row.label(text="Enables operators, panels, and wizards", icon='INFO')
         
         # Library management
         box.separator()
@@ -1043,7 +1060,6 @@ classes = (
     LIBADDON_APT_preferences,
     LIBADDON_OT_cleanup_libraries,
     LIBADDON_OT_readd_libraries,
-    LIBADDON_OT_manage_child_addon,
 )
 
 # Flag to track if libraries have been registered
@@ -1058,26 +1074,51 @@ def delayed_setup():
         return None  # Don't repeat timer
     
     try:
-        # Step 1: Add this parent to child addon tracking
-        tracking_data = add_parent_to_child_tracking()
-        
-        # Step 2: Register libraries (this will add us to central library tracking)
+        # Step 1: Register libraries (this will add us to central library tracking)
         register_all_libraries()
         
-        # Step 3: Ensure child addon files are installed
+        # Step 2: Ensure child addon files are installed
         ensure_child_addon_installed()
         
-        # Step 4: Check if child addon functionality is already loaded
-        if not tracking_data["is_functionality_loaded"]:
-            # Load child addon functionality if not already loaded
+        # Step 3: Load child addon functionality by default on first run
+        # On subsequent runs, only load if user hasn't explicitly disabled it
+        tracking_data = get_child_addon_tracking_data()
+        
+        # Check if this is the first time this parent is running
+        # (i.e., not in active_parents list yet)
+        is_first_run = PARENT_ADDON_UNIQUE_ID not in tracking_data["active_parents"]
+        
+        if is_first_run:
+            # First time this parent is running - enable child addon by default
+            print("🔄 First run detected - enabling child addon functionality by default")
+            
+            # Add this parent to active parents
+            tracking_data["active_parents"].append(PARENT_ADDON_UNIQUE_ID)
+            tracking_data["last_activated_by"] = PARENT_ADDON_UNIQUE_ID
+            save_child_addon_tracking_data(tracking_data)
+            
+            # Load child addon functionality
             if load_child_addon_functionality():
-                print("✅ Child addon functionality loaded")
+                print("✅ Child addon functionality loaded (first run)")
             else:
                 print("⚠ Could not load child addon functionality, but continuing...")
         else:
-            print("✓ Child addon functionality already loaded by another parent addon")
+            # Not first run - respect user's choice
+            if PARENT_ADDON_UNIQUE_ID in tracking_data["active_parents"]:
+                print("🔄 Auto-loading child addon functionality (user previously enabled it)")
+                
+                if not tracking_data["is_functionality_loaded"]:
+                    # Load child addon functionality if not already loaded
+                    if load_child_addon_functionality():
+                        print("✅ Child addon functionality loaded")
+                    else:
+                        print("⚠ Could not load child addon functionality, but continuing...")
+                else:
+                    print("✓ Child addon functionality already loaded")
+            else:
+                print("ℹ Child addon functionality not auto-loaded (user disabled it)")
         
-        # Step 5: Try to refresh asset browser
+        # Step 4: Try to refresh asset browser
         try:
             bpy.ops.asset.library_refresh()
         except:
@@ -1127,16 +1168,23 @@ def unregister():
     except:
         pass
     
+    # Check if we should unload child addon functionality
+    # First check if other parents are still active
+    tracking_data = get_child_addon_tracking_data()
+    
     # Remove this parent from child addon tracking
     tracking_data = remove_parent_from_child_tracking()
     
-    # Check if we should unload child addon functionality
     # Only unload if no other parent addons are active
     if len(tracking_data["active_parents"]) == 0:
         print("🔄 No other parent addons active - unloading child addon functionality...")
         unload_child_addon_functionality(force=True)
     else:
         print(f"🔄 {len(tracking_data['active_parents'])} other parent(s) still active - keeping child addon loaded")
+    
+    # Unregister the asset library from Blender preferences
+    print("🔄 Unregistering asset library from preferences...")
+    unregister_library()
     
     # Check if there are any active addons using the central library
     try:
@@ -1157,7 +1205,7 @@ def unregister():
         if addon_id in library_tracking_data:
             print(f"🔄 Removing {PARENT_ADDON_DISPLAY_NAME} from central library tracking")
             del library_tracking_data[addon_id]
-            utility.save_addon_tracking(central_base, library_tracking_data)
+            utility.write_addon_tracking(central_base, library_tracking_data)
             
             # Update active addons count after removal
             active_addons = len(library_tracking_data)
@@ -1173,17 +1221,23 @@ def unregister():
                 print(f"✓ {active_addons} addon(s) still using central library - keeping child addon files")
             if len(tracking_data["active_parents"]) > 0:
                 print(f"✓ {len(tracking_data['active_parents'])} parent addon(s) still active - keeping child addon files")
-            
+
     except Exception as e:
         print(f"⚠ Error checking library status: {e}")
         print("📚 Keeping child addon files for safety")
-    
-    # Unregister parent addon classes
+
+    # Force refresh the asset library after unregistering
+    try:
+        bpy.ops.asset.library_refresh()
+    except:
+        pass
+
+    # Unregister main classes (MUST be last to avoid issues with operators still being referenced)
     for cls in reversed(classes):
         try:
             bpy.utils.unregister_class(cls)
         except Exception as e:
             if "not registered" not in str(e) and "missing bl_rna" not in str(e):
                 print(f"⚠ Error unregistering class {cls.__name__}: {e}")
-
-    print("✅ Parent addon unregistered")
+    
+    print("✅ Parent addon fully unregistered")
