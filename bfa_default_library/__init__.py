@@ -18,7 +18,6 @@
 
 # -----------------------------------------------------------------------------
 # Modular Asset Library Addon - Parent Container
-# Manages library assets and child addons with functional operators, panels, etc.
 # -----------------------------------------------------------------------------
 
 import bpy
@@ -28,11 +27,14 @@ import sys
 import json
 from pathlib import Path
 
-from bpy.types import AddonPreferences, Preferences
+from bpy.types import Preferences
 from os import path as p
 
 # Import utility functions
 from . import utility
+
+# Import UI module (preferences panel) - imported after functions are defined
+# to avoid circular imports. See register() function.
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION - Edit these variables for each modular addon instance
@@ -70,14 +72,19 @@ CENTRAL_LIB_SUBFOLDERS = [
     "Shader Nodes Library",
     "Compositor Nodes Library"]  # Only include libraries that exist
 
-# Child addon modules to manage
-CHILD_ADDON_MODULES = [
-    "operators",
+# Child addon submodules to manage (single source of truth)
+# Note: "operators" is a package with its own submodules, handled separately in loading
+CHILD_ADDON_SUBMODULES = [
     "panels",
     "wizards",
     "wizard_handlers",
-    "wizard_operators"
+    "wizard_operators",
+    "ops",
+    "ui",
 ]
+
+# All child addon modules including the operators package (for cleanup/detection)
+CHILD_ADDON_ALL_MODULES = ["operators"] + CHILD_ADDON_SUBMODULES
 
 # -----------------------------------------------------------------------------
 
@@ -263,18 +270,8 @@ def is_child_addon_active():
                 print(f"⚠ Child addon module found in sys.modules but tracking says not loaded: {module_name}")
                 return True
     
-    # Also check for direct module names
-    direct_modules = [
-        "operators",
-        "panels",
-        "wizards",
-        "wizard_handlers",
-        "wizard_operators",
-        "ops",
-        "ui"
-    ]
-    
-    for module in direct_modules:
+    # Also check for direct module names (use centralized constant)
+    for module in CHILD_ADDON_ALL_MODULES:
         if module in sys.modules:
             # Check if it's from our child addon
             module_obj = sys.modules[module]
@@ -453,19 +450,10 @@ def load_child_addon_functionality():
                 print(f"⚠ Failed to import child addon package: {e}")
                 return False
             
-            # Now import the submodules
-            submodules_to_load = [
-                "panels",
-                "wizards",
-                "wizard_handlers",
-                "wizard_operators",
-                "ops",
-                "ui",
-            ]
-            
+            # Now import the submodules (use centralized constant)
             loaded_modules = {}
-            
-            for submodule_name in submodules_to_load:
+
+            for submodule_name in CHILD_ADDON_SUBMODULES:
                 try:
                     full_name = f"{package_name}.{submodule_name}"
                     module = importlib.import_module(full_name)
@@ -521,116 +509,6 @@ def load_child_addon_functionality():
         traceback.print_exc()
         return False
 
-def _load_child_addon_modules_individually(child_addon_dir):
-    """Fallback method to load child addon modules individually."""
-    print("🔄 Falling back to individual module loading...")
-    
-    import importlib.util
-    
-    # List of modules to load (excluding operators directory)
-    modules_to_load = [
-        ("panels", "panels.py"),
-        ("wizards", "wizards.py"),
-        ("wizard_handlers", "wizard_handlers.py"),
-        ("wizard_operators", "wizard_operators.py"),
-        ("ops", "ops.py"),
-        ("ui", "ui.py"),
-    ]
-    
-    loaded_modules = {}
-    
-    for module_name, filename in modules_to_load:
-        file_path = p.join(child_addon_dir, filename)
-        if p.exists(file_path):
-            try:
-                # Load the module
-                spec = importlib.util.spec_from_file_location(module_name, file_path)
-                module = importlib.util.module_from_spec(spec)
-                
-                # Store in sys.modules with a unique name
-                unique_name = f"modular_child_addons_{module_name}"
-                sys.modules[unique_name] = module
-                
-                # Execute the module (disable relative imports temporarily)
-                # Save the current __package__ value
-                original_package = getattr(module, '__package__', None)
-                module.__package__ = None  # Disable relative imports
-                
-                try:
-                    spec.loader.exec_module(module)
-                finally:
-                    # Restore original package if it existed
-                    if original_package is not None:
-                        module.__package__ = original_package
-                
-                # Store reference
-                loaded_modules[module_name] = module
-                print(f"✓ Loaded module (fallback): {module_name}")
-                
-            except Exception as e:
-                print(f"⚠ Failed to load module {module_name} (fallback): {e}")
-                continue
-        else:
-            print(f"⚠ Module file not found (fallback): {filename}")
-    
-    # Register the loaded modules
-    for module_name, module in loaded_modules.items():
-        if hasattr(module, 'register'):
-            try:
-                module.register()
-                print(f"✓ Registered module (fallback): {module_name}")
-            except Exception as e:
-                print(f"⚠ Failed to register module {module_name} (fallback): {e}")
-    
-    # Load operators
-    _load_operator_modules_individually(p.join(child_addon_dir, "operators"), "modular_child_addons")
-    
-    return len(loaded_modules) > 0
-
-def _load_operator_modules_individually(operators_dir, package_prefix):
-    """Load operator modules individually."""
-    if not p.exists(operators_dir):
-        return
-    
-    import importlib.util
-    
-    operator_files = [
-        ("geometry_nodes", "geometry_nodes.py"),
-        ("compositor", "compositor.py"),
-        ("shader", "shader.py"),
-    ]
-    
-    for submodule_name, filename in operator_files:
-        submodule_path = p.join(operators_dir, filename)
-        if p.exists(submodule_path):
-            try:
-                # Load submodule
-                spec = importlib.util.spec_from_file_location(submodule_name, submodule_path)
-                module = importlib.util.module_from_spec(spec)
-                
-                # Store in sys.modules
-                unique_name = f"{package_prefix}_operators_{submodule_name}"
-                sys.modules[unique_name] = module
-                
-                # Execute with disabled relative imports
-                original_package = getattr(module, '__package__', None)
-                module.__package__ = None
-                
-                try:
-                    spec.loader.exec_module(module)
-                finally:
-                    if original_package is not None:
-                        module.__package__ = original_package
-                
-                # Register if it has a register function
-                if hasattr(module, 'register'):
-                    module.register()
-                    print(f"✓ Loaded and registered operator (fallback): {submodule_name}")
-                    
-            except Exception as e:
-                print(f"⚠ Failed to load operator {submodule_name} (fallback): {e}")
-
-
 def unload_child_addon_functionality(force=False):
     """Unload and unregister child addon functionality."""
     try:
@@ -646,8 +524,7 @@ def unload_child_addon_functionality(force=False):
         # 3. "modular_child_addons_panels" (old style, for compatibility)
         import sys
         
-        # List of module names we might have loaded
-        base_modules = ["operators", "panels", "wizards", "wizard_handlers", "wizard_operators", "ops", "ui"]
+        # Use centralized module list
         operator_submodules = ["geometry_nodes", "compositor", "shader"]
         
         all_module_names = []
@@ -657,7 +534,7 @@ def unload_child_addon_functionality(force=False):
         all_module_names.append(package_name)  # Main package
         
         # Add dot-notation module names
-        for name in base_modules:
+        for name in CHILD_ADDON_ALL_MODULES:
             all_module_names.append(f"{package_name}.{name}")
         
         # Add operator submodules
@@ -666,7 +543,7 @@ def unload_child_addon_functionality(force=False):
             all_module_names.append(f"{package_name}.operators.{name}")
         
         # Add underscore-style module names (old approach, for compatibility)
-        for name in base_modules:
+        for name in CHILD_ADDON_ALL_MODULES:
             all_module_names.append(f"{package_name}_{name}")
         
         # Add operator submodules with underscores
@@ -674,7 +551,7 @@ def unload_child_addon_functionality(force=False):
             all_module_names.append(f"{package_name}_operators_{name}")
         
         # Also check for the original module names (without prefix) as fallback
-        for name in base_modules:
+        for name in CHILD_ADDON_ALL_MODULES:
             all_module_names.append(name)
         
         unregistered_count = 0
@@ -945,122 +822,10 @@ def unregister_all_libraries():
     unregister_library()
 
 
-# -----------------------------------------------------------------------------
-# Library Operators for Preferences Panel
-# -----------------------------------------------------------------------------
-
-class LIBADDON_OT_cleanup_libraries(bpy.types.Operator):
-    """Remove all Default Library asset libraries from preferences (manual cleanup)"""
-    bl_idname = "preferences.libaddon_cleanup_libraries"
-    bl_label = "Remove Libraries"
-    bl_description = "Remove all Default Library asset libraries from Blender preferences"
-    bl_options = {'REGISTER', 'INTERNAL'}
-    
-    def execute(self, context):
-        fully_uninstall_library()
-        self.report({'INFO'}, "Default Library asset libraries removed from preferences")
-        return {'FINISHED'}
-
-
-class LIBADDON_OT_readd_libraries(bpy.types.Operator):
-    """Re-add all Default Library asset libraries to preferences"""
-    bl_idname = "preferences.libaddon_readd_libraries"
-    bl_label = "Re-add Libraries"
-    bl_description = "Re-add all Default Library asset libraries to Blender preferences"
-    bl_options = {'REGISTER', 'INTERNAL'}
-    
-    def execute(self, context):
-        register_library(force_reregister=True)
-        
-        try:
-            bpy.ops.asset.library_refresh()
-        except:
-            pass
-        
-        self.report({'INFO'}, "Default Library asset libraries re-added to preferences")
-        return {'FINISHED'}
-
-
-
-
-
-# -----------------------------------------------------------------------------
-# Parent Addon Preferences Panel
-# -----------------------------------------------------------------------------
-
-class LIBADDON_APT_preferences(AddonPreferences):
-    """Parent addon preferences panel in user preferences"""
-    bl_idname = __name__
-    
-    def draw(self, context):
-        layout = self.layout
-        
-        # Header
-        box = layout.box()
-        box.label(text="Modular Asset Library System", icon='LIBRARY_DATA_DIRECT')
-        
-        # Parent addon info
-        row = box.row()
-        row.label(text="Parent Addon (Library Manager):")
-        row = box.row()
-        row.label(text=f"  Name: {PARENT_ADDON_DISPLAY_NAME}")
-        row = box.row()
-        row.label(text=f"  Version: {PARENT_ADDON_VERSION}")
-        
-        # Child addon status
-        box.separator()
-        box.label(text="Child Addon (Functionality):", icon='SCRIPT')
-        
-        row = box.row()
-        if is_child_addon_installed():
-            row.label(text="  Status: Files Installed", icon='CHECKMARK')
-        else:
-            row.label(text="  Status: Files Not Installed", icon='X')
-        
-        # Show if child addon functionality is loaded
-        row = box.row()
-        if is_child_addon_active():
-            row.label(text="  Functionality: Loaded", icon='CHECKMARK')
-        else:
-            row.label(text="  Functionality: Not Loaded", icon='X')
-        
-        # Child addon management buttons
-        box.separator()
-        box.label(text="Child Addon Management:", icon='TOOL_SETTINGS')
-
-            
-            # Show note about what this does
-            row = box.row()
-            row.label(text="Enables operators, panels, and wizards", icon='INFO')
-        
-        # Library management
-        box.separator()
-        box.label(text="Library Management:", icon='ASSET_MANAGER')
-        
-        row = box.row(align=True)
-        row.operator("preferences.libaddon_readd_libraries", 
-                    text="Re-add Libraries", 
-                    icon='FILE_REFRESH')
-        
-        row.operator("preferences.libaddon_cleanup_libraries", 
-                    text="Remove Libraries", 
-                    icon='TRASH')
-        
-        # Info text
-        box.separator()
-        box.label(text="Note: Parent addon manages libraries,", icon='INFO')
-        box.label(text="child addon provides functionality.", icon='BLANK1')
-
 
 # -----------------------------------------------------------------------------
 # Main Registration
 # -----------------------------------------------------------------------------
-
-classes = (
-    LIBADDON_APT_preferences,
-    LIBADDON_OT_cleanup_libraries,
-    LIBADDON_OT_readd_libraries,
-)
 
 # Flag to track if libraries have been registered
 _library_refresh_done = False
@@ -1141,18 +906,14 @@ def register():
     """Register the parent addon."""
     global _library_refresh_done
     _library_refresh_done = False
-    
-    # Register main classes
-    for cls in classes:
-        try:
-            bpy.utils.register_class(cls)
-        except ValueError as e:
-            if "already registered" not in str(e):
-                print(f"⚠ Error registering {cls.__name__}: {e}")
-    
+
+    # Import and register UI module (preferences panel and operators)
+    from . import ui
+    ui.register()
+
     # Add delayed setup timer
     bpy.app.timers.register(delayed_setup, first_interval=0.5)
-    
+
     print("✅ Parent addon registered (library manager)")
 
 
@@ -1232,12 +993,8 @@ def unregister():
     except:
         pass
 
-    # Unregister main classes (MUST be last to avoid issues with operators still being referenced)
-    for cls in reversed(classes):
-        try:
-            bpy.utils.unregister_class(cls)
-        except Exception as e:
-            if "not registered" not in str(e) and "missing bl_rna" not in str(e):
-                print(f"⚠ Error unregistering class {cls.__name__}: {e}")
-    
+    # Unregister UI module (MUST be last to avoid issues with operators still being referenced)
+    from . import ui
+    ui.unregister()
+
     print("✅ Parent addon fully unregistered")

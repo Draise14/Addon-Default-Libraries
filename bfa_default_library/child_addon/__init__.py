@@ -25,7 +25,37 @@ This file should be empty or contain minimal code since the parent addon
 handles all module loading and registration.
 """
 
-# No imports or registration here - handled by parent addon
+import bpy
+
+# -----------------------------------------------------------------------------
+# Shared Utilities
+# -----------------------------------------------------------------------------
+
+def is_bforartists():
+    """
+    Check if running in Bforartists (vs standard Blender).
+
+    Returns True if running in Bforartists, False if running in Blender.
+    This is determined by checking for Bforartists-specific UI elements.
+    """
+    return "OUTLINER_MT_view" in dir(bpy.types)
+
+
+def get_icon(bforartists_icon, blender_fallback="INFO"):
+    """
+    Get the appropriate icon based on whether running in Bforartists or Blender.
+
+    Args:
+        bforartists_icon: Icon name to use in Bforartists
+        blender_fallback: Icon name to use in standard Blender (default: "INFO")
+
+    Returns:
+        The appropriate icon name string.
+    """
+    return bforartists_icon if is_bforartists() else blender_fallback
+
+
+# No registration here - handled by parent addon
 # This file exists so Python recognizes this as a package
 
 # Placeholder functions that do nothing - actual registration is handled by parent

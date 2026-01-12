@@ -31,124 +31,23 @@ from .wizard_handlers import detect_wizard_for_object, draw_wizard_button
 # Import operations from submodules
 from .ops import OBJECT_OT_ApplySelected
 
+
 # -----------------------------------------------------------------------------
-# Interface Operator Entries Helpers
+# Icon Compatibility
 # -----------------------------------------------------------------------------
 
-# -----------------------------------
-# Smart Primitive Interface Operators
-# -----------------------------------
-
-# Define the path to the asset library and asset names with icons
-# Note: In child addon, asset paths need to be resolved at runtime
-SMART_PRIMITIVE_ASSETS = [
-    ("Capsule", "MESH_CAPSULE"),
-    ("Capsule Revolved", "MESH_CAPSULE"),
-    ("Circle", "MESH_CIRCLE"),
-    ("Circle Revolved", "MESH_CIRCLE"),
-    ("Cone", "MESH_CONE"),
-    ("Cone Rounded", "MESH_CONE"),
-    ("Cone Rounded Revolved", "MESH_CONE"),
-    ("Cube", "MESH_CUBE"),
-    ("Cube Rounded", "MESH_CUBE"),
-    ("Curve Lofted", "CURVE_PATH"),
-    ("Cylinder", "MESH_CYLINDER"),
-    ("Cylinder Revolved", "MESH_CYLINDER"),
-    ("Cylinder Rounded", "MESH_CYLINDER"),
-    ("Cylinder Rounded Revolved", "MESH_CYLINDER"),
-    ("Grid", "MESH_GRID"),
-    ("Icosphere", "MESH_ICOSPHERE"),
-    ("Sphere", "MESH_UVSPHERE"),
-    ("Sphere Revolved", "MESH_UVSPHERE"),
-    ("Spiral", "FORCE_VORTEX"),
-    ("Torus", "MESH_TORUS"),
-    ("Torus Revolved", "MESH_TORUS"),
-    ("Tube", "MESH_CYLINDER"),
-    ("Tube Revolved", "MESH_CYLINDER"),
-    ("Tube Rounded", "MESH_CYLINDER"),
-    ("Tube Rounded Revolved", "MESH_CYLINDER"),
-]
+def is_bforartists():
+    """Check if running in Bforartists (has BFA-specific UI elements)."""
+    return "OUTLINER_MT_view" in dir(bpy.types)
 
 
-def get_asset_library_path(library_name, asset_file):
-    """Get the path to an asset library file from the central library."""
-    # This function should be implemented based on how the parent addon
-    # stores and manages asset libraries. For now, we'll return a placeholder.
-    # In a real implementation, you might want to query the parent addon
-    # or use the central library path from user preferences.
-    return None
+def get_icon(bfa_icon, blender_fallback):
+    """Get appropriate icon for Bforartists or Blender."""
+    return bfa_icon if is_bforartists() else blender_fallback
 
-
-def append_asset_as_object(filepath, object_name):
-    """Append an object from the library as a local copy"""
-    if not filepath or not os.path.exists(filepath):  # Check if file exists
-        print(f"Error: {filepath} not found!")
-        return None
-
-    with bpy.data.libraries.load(filepath, link=False) as (data_from, data_to):
-        if object_name in data_from.objects:
-            data_to.objects = [object_name]
-
-    if data_to.objects:
-        obj = data_to.objects[0]
-        new_obj = obj.copy()
-        new_obj.data = obj.data.copy() if obj.data else None
-        new_obj.location = bpy.context.scene.cursor.location
-        new_obj.rotation_euler = bpy.context.scene.cursor.rotation_euler
-        bpy.context.collection.objects.link(new_obj)
-        return new_obj
-    return None
-
-
-class WM_OT_AppendAsset(Operator):
-    """Appends an asset from the library to the 3D Cursor"""
-    bl_idname = "wm.insert_mesh_asset"
-    bl_label = "Insert Mesh Asset"
-    bl_description = "Appends an asset from the library"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    asset_name: bpy.props.StringProperty(
-        name="Asset Name",
-        description="Name of the asset to insert"
-    )
-
-    def execute(self, context):
-        # Try to find the asset file from the central library
-        # This is a simplified version - in production you'd need to
-        # locate the actual asset file from the registered libraries
-        library_name = "Geometry Nodes Library"
-        asset_file = "G_Primitives.blend"
-        
-        # Get the path from the parent addon or central library
-        # For now, we'll try to use the active asset libraries
-        for lib in context.preferences.filepaths.asset_libraries:
-            if lib.name == library_name:
-                filepath = os.path.join(lib.path, asset_file)
-                if os.path.exists(filepath):
-                    obj = append_asset_as_object(filepath, self.asset_name)
-                    if obj:
-                        self.report({'INFO'}, f"Appended {self.asset_name}")
-                        return {'FINISHED'}
-        
-        self.report({'ERROR'}, f"Could not find asset library or file for {self.asset_name}")
-        return {'CANCELLED'}
-
-
-class ASSET_MT_primitive_add(Menu):
-    bl_label = "Smart Primitives"
-    bl_idname = "ASSET_MT_primitive_add"
-    bl_icon = 'ORIGIN_TO_GEOMETRY'
-
-    def draw(self, context):
-        layout = self.layout
-        for asset_name, icon in SMART_PRIMITIVE_ASSETS:
-            op = layout.operator("wm.insert_mesh_asset", text=asset_name, icon=icon)
-            op.asset_name = asset_name
-
-
-# -------------------------
+# -----------------------------------------------------------------------------
 # Wizard Interface Operator
-# -------------------------
+# -----------------------------------------------------------------------------
 
 class WIZARD_OT_TriggerAssetWizard(Operator):
     """Trigger the appropriate wizard for the selected asset or object"""
@@ -211,6 +110,9 @@ class LIBADDON_APT_child_preferences(bpy.types.AddonPreferences):
         box.label(text="Addon Status", icon='CHECKBOX_HLT')
         
         # Check if parent addon is active
+        # NOTE: Parent addon package name is hardcoded here as this child addon
+        # is specifically designed for the bfa_default_library parent addon.
+        # For multi-parent support, this would need to be made configurable.
         parent_active = "bfa_default_library" in bpy.context.preferences.addons
         if parent_active:
             box.label(text="Parent Addon: Active", icon='CHECKMARK')
@@ -225,14 +127,6 @@ class LIBADDON_APT_child_preferences(bpy.types.AddonPreferences):
 # Interface Entries
 # -----------------------------------------------------------------------------#
 
-# 3D View - Add
-def primitive_menu_func(self, context):
-    # Add the sub-menu to the Add menu with an icon
-    layout = self.layout
-    layout.separator()
-    layout.menu("ASSET_MT_primitive_add", icon='ORIGIN_TO_GEOMETRY')
-
-
 # 3D View - Object - Asset
 def wizard_menu_func(self, context):
     """Add wizard trigger to asset menu"""
@@ -242,34 +136,31 @@ def wizard_menu_func(self, context):
     if context.object:
         # Check if object has any wizard-compatible features
         has_wizard, _, _ = detect_wizard_for_object(obj)
-        
-        if "OUTLINER_MT_view" in dir(bpy.types):
-            icon = "WIZARD"
-        else:
-            icon = "INFO"
 
         if has_wizard:
+            # WIZARD icon is Bforartists-only, use INFO for Blender
+            icon = get_icon("WIZARD", "INFO")
             draw_wizard_button(layout, obj, "Open Asset Wizard", icon, 1.5)
 
 # 3D View - Object - Apply
 def apply_join_menu_func(self, context):
     """Add apply operators to apply menu"""
     layout = self.layout
-    obj = context.object
 
     if context.object:
         layout.separator()
+        # JOIN icon is Bforartists-only, use MESH_DATA for Blender
         op = layout.operator("object.apply_selected_objects",
                              text="Visual Geometry and Join",
-                             icon='JOIN')
+                             icon=get_icon('JOIN', 'MESH_DATA'))
         op.join_on_apply = True
         op.boolean_on_apply = False
         op.remesh_on_apply = False
 
+
 def apply_boolean_menu_func(self, context):
     """Add boolean apply operator to apply menu"""
     layout = self.layout
-    obj = context.object
 
     if context.object:
         op = layout.operator("object.apply_selected_objects",
@@ -279,10 +170,10 @@ def apply_boolean_menu_func(self, context):
         op.boolean_on_apply = True
         op.remesh_on_apply = False
 
+
 def apply_remesh_menu_func(self, context):
     """Add remesh apply operator to apply menu"""
     layout = self.layout
-    obj = context.object
 
     if context.object:
         op = layout.operator("object.apply_selected_objects",
@@ -297,8 +188,6 @@ def apply_remesh_menu_func(self, context):
 # -----------------------------------------------------------------------------#
 
 classes = (
-    WM_OT_AppendAsset,
-    ASSET_MT_primitive_add,
     WIZARD_OT_TriggerAssetWizard,
     LIBADDON_APT_child_preferences,
 )
@@ -307,32 +196,54 @@ classes = (
 # Register
 # -----------------------------------------------------------------------------#
 
+# Track menu registration to prevent duplicates
+_menu_registered = False
+
+
 def register():
     """Register UI classes and append menu functions."""
+    global _menu_registered
+
     for cls in classes:
         try:
             bpy.utils.register_class(cls)
         except ValueError as e:
             if "already registered" not in str(e):
                 print(f"⚠ Error registering {cls.__name__}: {e}")
-    
-    # Add menu functions
-    bpy.types.VIEW3D_MT_add.append(primitive_menu_func)
-    bpy.types.VIEW3D_MT_object_asset.append(wizard_menu_func)
-    bpy.types.VIEW3D_MT_object_apply.append(apply_join_menu_func)
-    bpy.types.VIEW3D_MT_object_apply.append(apply_boolean_menu_func)
-    bpy.types.VIEW3D_MT_object_apply.append(apply_remesh_menu_func)
+
+    # Add menu functions only once (prevent duplicates from multiple parent addons)
+    if not _menu_registered:
+        bpy.types.VIEW3D_MT_object_asset.append(wizard_menu_func)
+        bpy.types.VIEW3D_MT_object_apply.append(apply_join_menu_func)
+        bpy.types.VIEW3D_MT_object_apply.append(apply_boolean_menu_func)
+        bpy.types.VIEW3D_MT_object_apply.append(apply_remesh_menu_func)
+        _menu_registered = True
 
 
 def unregister():
     """Unregister UI classes and remove menu functions."""
-    # Remove menu functions
-    bpy.types.VIEW3D_MT_add.remove(primitive_menu_func)
-    bpy.types.VIEW3D_MT_object_asset.remove(wizard_menu_func)
-    bpy.types.VIEW3D_MT_object_apply.remove(apply_join_menu_func)
-    bpy.types.VIEW3D_MT_object_apply.remove(apply_boolean_menu_func)
-    bpy.types.VIEW3D_MT_object_apply.remove(apply_remesh_menu_func)
-    
+    global _menu_registered
+
+    # Remove menu functions if registered
+    if _menu_registered:
+        try:
+            bpy.types.VIEW3D_MT_object_asset.remove(wizard_menu_func)
+        except ValueError:
+            pass
+        try:
+            bpy.types.VIEW3D_MT_object_apply.remove(apply_join_menu_func)
+        except ValueError:
+            pass
+        try:
+            bpy.types.VIEW3D_MT_object_apply.remove(apply_boolean_menu_func)
+        except ValueError:
+            pass
+        try:
+            bpy.types.VIEW3D_MT_object_apply.remove(apply_remesh_menu_func)
+        except ValueError:
+            pass
+        _menu_registered = False
+
     # Unregister classes
     for cls in reversed(classes):
         try:
