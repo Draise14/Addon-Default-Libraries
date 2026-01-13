@@ -1,0 +1,44 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+*.zip
+*.tar.gz
+build/
+dist/
+*.egg-info/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Blender specific
+*.blend1
+*.blend2
+*.blend3
+*.blend4
+*.blend5
+
+# Testing artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local development
+.env
+.env.local

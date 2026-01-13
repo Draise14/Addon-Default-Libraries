@@ -4,11 +4,10 @@ All notable changes to the BFA Default Asset Library addon will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.2.8]
+## [Unreleased]
 
 ### Changed
 - **Modular UI refactor**: Moved preferences panel (`LIBADDON_APT_preferences`) and library management operators (`LIBADDON_OT_cleanup_libraries`, `LIBADDON_OT_readd_libraries`) from `__init__.py` to dedicated `ui.py` module for better code organization and maintainability.
-- **Combined documentation files**: to explain the addon a bit better
 
 ### Fixed
 - **Child addon import issues**: Fixed `"attempted relative import with no known parent package"` error by loading child addon as proper Python package using `importlib.import_module()` instead of standalone modules

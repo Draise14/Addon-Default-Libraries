@@ -42,9 +42,9 @@ from . import utility
 
 # Parent addon info - this is the container/library manager
 bl_info = {
-    "name": "Default Asset Library",
+    "name": "Default Asset Library Copy",
     "author": "Andres (Draise) Stephens, Ereaser45-Studios, Iyad Ahmed, Juan Carlos Aragon",
-    "version": (1, 2, 8),
+    "version": (1, 2, 7),
     "blender": (4, 4, 3),
     "location": "Asset Browser>Default Library",
     "description": "Adds a modular default asset library and addon with wizards and complementary operators",
@@ -56,8 +56,8 @@ bl_info = {
 }
 
 # Addon identification - MUST BE UNIQUE for each compiled parent addon
-PARENT_ADDON_UNIQUE_ID = "default_asset_library_1_2_7"
-PARENT_ADDON_DISPLAY_NAME = "Default Asset Library"
+PARENT_ADDON_UNIQUE_ID = "default_asset_library_copy_1_2_7"
+PARENT_ADDON_DISPLAY_NAME = "Default Asset Library Copy"
 PARENT_ADDON_VERSION = (1, 2, 7)
 
 # Child addon info - this is the functional addon
@@ -73,7 +73,7 @@ CENTRAL_LIB_SUBFOLDERS = [
     "Compositor Nodes Library"]  # Only include libraries that exist
 
 # Child addon submodules to manage (single source of truth)
-# Note: "operators" is a package with its own submodules, handled separately in loadingollama run qwen2.5-coder
+# Note: "operators" is a package with its own submodules, handled separately in loading
 CHILD_ADDON_SUBMODULES = [
     "panels",
     "wizards",
@@ -113,29 +113,29 @@ def copy_child_addon_to_user_prefs():
     parent_addon_dir = p.dirname(__file__)
     child_addon_src = p.join(parent_addon_dir, "child_addon")
     child_addon_dst = get_child_addon_path()
-
+    
     if not p.exists(child_addon_src):
         print(f"⚠ Child addon source directory not found: {child_addon_src}")
         return False
-
+    
     try:
         # First, remove destination directory if it exists (for clean reinstall)
         if p.exists(child_addon_dst):
             print(f"🔄 Removing existing child addon directory: {child_addon_dst}")
             shutil.rmtree(child_addon_dst)
-
+        
         # Create destination directory
         os.makedirs(child_addon_dst, exist_ok=True)
-
+        
         # Copy all files from child_addon directory (not just Python files)
         for root, dirs, files in os.walk(child_addon_src):
             # Get relative path for destination
             rel_path = os.path.relpath(root, child_addon_src)
             dest_dir = os.path.join(child_addon_dst, rel_path)
-
+            
             # Create destination directory
             os.makedirs(dest_dir, exist_ok=True)
-
+            
             # Copy all files (only Python files)
             for file in files:
                 if file.endswith('.py'):
@@ -152,19 +152,19 @@ def copy_child_addon_to_user_prefs():
                     dest_file = os.path.join(dest_dir, file)
                     shutil.copy2(src_file, dest_file)
                     print(f"  ✓ Copied: {file}")
-
+        
         print(f"✅ Child addon copied to: {child_addon_dst}")
-
+        
         # Verify the copy worked - only check for Python files
         init_file = p.join(child_addon_dst, "__init__.py")
-
+        
         if p.exists(init_file):
             print(f"✅ Verification: __init__.py present")
             return True
         else:
             print(f"❌ Verification failed: __init__.py missing")
             return False
-
+            
     except Exception as e:
         print(f"⚠ Error copying child addon: {e}")
         import traceback
@@ -178,12 +178,12 @@ def activate_child_addon():
     This doesn't actually activate it as a separate addon in preferences.
     """
     print("🔄 Loading child addon functionality...")
-
+    
     # Ensure child addon is installed first
     if not ensure_child_addon_installed():
         print("❌ Failed to install child addon files")
         return False
-
+    
     # Load the child addon functionality
     if load_child_addon_functionality():
         # Add this parent to tracking (since we're manually loading)
@@ -198,11 +198,11 @@ def activate_child_addon():
 def deactivate_child_addon():
     """Deactivate the child addon by unloading its functionality."""
     print("🔄 Unloading child addon functionality...")
-
+    
     # First check if other parents would still be active after we remove
     tracking_data = get_child_addon_tracking_data()
     other_parents_active = len([p for p in tracking_data["active_parents"] if p != PARENT_ADDON_UNIQUE_ID])
-
+    
     # Try to unload (will return True if already unloaded or if other parents are active)
     if unload_child_addon_functionality(force=False):
         # Remove this parent from tracking (since we're manually unloading)
@@ -220,7 +220,7 @@ def deactivate_child_addon():
 def remove_child_addon_from_user_prefs():
     """Remove the child addon files from user preferences."""
     child_addon_dir = get_child_addon_path()
-
+    
     if p.exists(child_addon_dir):
         try:
             shutil.rmtree(child_addon_dir)
@@ -244,7 +244,7 @@ def is_child_addon_installed():
 def is_child_addon_active():
     """
     Check if child addon functionality is loaded.
-
+    
     We check both:
     1. The tracking data (which should be accurate if everyone follows the protocol)
     2. sys.modules (as a fallback if tracking data is wrong)
@@ -253,23 +253,23 @@ def is_child_addon_active():
     tracking_data = get_child_addon_tracking_data()
     if tracking_data["is_functionality_loaded"]:
         return True
-
+    
     # Fallback: Check sys.modules
     child_addon_name = "modular_child_addons"
-
+    
     # Check if any of the child addon modules are loaded
     module_prefixes = [
         f"{child_addon_name}.",
         "child_addon.",
     ]
-
+    
     for module_name in sys.modules:
         for prefix in module_prefixes:
             if module_name.startswith(prefix):
                 # Found a module from our child addon
                 print(f"⚠ Child addon module found in sys.modules but tracking says not loaded: {module_name}")
                 return True
-
+    
     # Also check for direct module names (use centralized constant)
     for module in CHILD_ADDON_ALL_MODULES:
         if module in sys.modules:
@@ -280,7 +280,7 @@ def is_child_addon_active():
                 if filepath and 'modular_child_addons' in filepath:
                     print(f"⚠ Child addon module found in sys.modules but tracking says not loaded: {module}")
                     return True
-
+    
     return False
 
 
@@ -297,17 +297,17 @@ def is_child_addon_enabled_for_this_parent():
 def get_child_addon_tracking_data():
     """Get child addon tracking data to manage multiple parent addons."""
     central_base = get_central_library_base()
-
+    
     # Create child addon tracking file path
     tracking_file = p.join(central_base, "child_addon_tracking.json")
-
+    
     # Default tracking data
     default_data = {
         "active_parents": [],  # List of parent addon IDs that are using the child addon
         "last_activated_by": None,  # Last parent addon that activated the child addon
         "is_functionality_loaded": False  # Whether child addon functionality is currently loaded
     }
-
+    
     # Try to read existing tracking data
     try:
         if p.exists(central_base) and p.exists(tracking_file):
@@ -319,7 +319,7 @@ def get_child_addon_tracking_data():
     except Exception as e:
         print(f"⚠ Error reading child addon tracking: {e}")
         return default_data
-
+    
     return default_data
 
 
@@ -327,11 +327,11 @@ def save_child_addon_tracking_data(tracking_data):
     """Save child addon tracking data."""
     central_base = get_central_library_base()
     tracking_file = p.join(central_base, "child_addon_tracking.json")
-
+    
     try:
         # Ensure the directory exists before trying to write
         os.makedirs(central_base, exist_ok=True)
-
+        
         with open(tracking_file, 'w') as f:
             json.dump(tracking_data, f, indent=2)
         return True
@@ -344,12 +344,12 @@ def add_parent_to_child_tracking():
     """Add this parent addon to the child addon tracking."""
     tracking_data = get_child_addon_tracking_data()
     parent_addon_id = PARENT_ADDON_UNIQUE_ID
-
+    
     if parent_addon_id not in tracking_data["active_parents"]:
         tracking_data["active_parents"].append(parent_addon_id)
         print(f"✓ Added parent {PARENT_ADDON_DISPLAY_NAME} to child addon tracking")
         save_child_addon_tracking_data(tracking_data)
-
+    
     return tracking_data
 
 
@@ -357,12 +357,12 @@ def remove_parent_from_child_tracking():
     """Remove this parent addon from the child addon tracking."""
     tracking_data = get_child_addon_tracking_data()
     parent_addon_id = PARENT_ADDON_UNIQUE_ID
-
+    
     if parent_addon_id in tracking_data["active_parents"]:
         tracking_data["active_parents"].remove(parent_addon_id)
         print(f"✓ Removed parent {PARENT_ADDON_DISPLAY_NAME} from child addon tracking")
         save_child_addon_tracking_data(tracking_data)
-
+    
     return tracking_data
 
 
@@ -375,13 +375,13 @@ def should_keep_child_addon_active():
 def ensure_child_addon_installed():
     """Ensure child addon files are copied to extensions folder, but don't try to activate it."""
     child_addon_dir = get_child_addon_path()
-
+    
     # Check if already installed
     child_init_file = p.join(child_addon_dir, "__init__.py")
     if p.exists(child_init_file):
         print(f"✓ Child addon already installed at: {child_addon_dir}")
         return True
-
+    
     # Install if not exists
     print("📦 Installing child addon files...")
     if copy_child_addon_to_user_prefs():
@@ -399,19 +399,19 @@ def load_child_addon_functionality():
         tracking_data = get_child_addon_tracking_data()
         if tracking_data["is_functionality_loaded"]:
             print("✓ Child addon functionality already loaded")
-
+            
             # Still add this parent to tracking even if already loaded
             if PARENT_ADDON_UNIQUE_ID not in tracking_data["active_parents"]:
                 tracking_data["active_parents"].append(PARENT_ADDON_UNIQUE_ID)
                 tracking_data["last_activated_by"] = PARENT_ADDON_UNIQUE_ID
                 save_child_addon_tracking_data(tracking_data)
                 print(f"✓ Added {PARENT_ADDON_DISPLAY_NAME} to active parents")
-
+            
             return True
-
+        
         # Get child addon path
         child_addon_dir = get_child_addon_path()
-
+        
         # Check if child addon is installed
         child_init_file = p.join(child_addon_dir, "__init__.py")
         if not p.exists(child_init_file):
@@ -420,28 +420,28 @@ def load_child_addon_functionality():
             if not ensure_child_addon_installed():
                 print(f"❌ Could not install child addon")
                 return False
-
+        
         print("🔄 Loading child addon functionality...")
-
+        
         # We need to load the child addon as a proper package
         # The child addon is in a directory like: .../modular_child_addons/
         # We'll add the parent directory to sys.path and import it as a package
-
+        
         # Get the parent directory (where modular_child_addons folder is located)
         parent_dir = p.dirname(child_addon_dir)
         package_name = p.basename(child_addon_dir)  # Should be "modular_child_addons"
-
+        
         # Save original sys.path
         original_sys_path = sys.path.copy()
-
+        
         try:
             # Add parent directory to sys.path if not already there
             if parent_dir not in sys.path:
                 sys.path.insert(0, parent_dir)
-
+            
             # Now import the child addon as a package
             import importlib
-
+            
             # Import the main package (this will load __init__.py)
             try:
                 child_package = importlib.import_module(package_name)
@@ -449,7 +449,7 @@ def load_child_addon_functionality():
             except ImportError as e:
                 print(f"⚠ Failed to import child addon package: {e}")
                 return False
-
+            
             # Now import the submodules (use centralized constant)
             loaded_modules = {}
 
@@ -461,7 +461,7 @@ def load_child_addon_functionality():
                     print(f"✓ Loaded module: {submodule_name}")
                 except ImportError as e:
                     print(f"⚠ Failed to import module {submodule_name}: {e}")
-
+            
             # Load operators subpackage
             operators_module = None
             try:
@@ -469,7 +469,7 @@ def load_child_addon_functionality():
                 print(f"✓ Loaded operators subpackage")
             except ImportError as e:
                 print(f"⚠ Failed to import operators subpackage: {e}")
-
+            
             # Register all modules that have a register function
             # Register operators first (if it has a register function at the package level)
             if operators_module and hasattr(operators_module, 'register'):
@@ -478,7 +478,7 @@ def load_child_addon_functionality():
                     print(f"✓ Registered operators subpackage")
                 except Exception as e:
                     print(f"⚠ Failed to register operators subpackage: {e}")
-
+            
             # Register other modules
             for module_name, module in loaded_modules.items():
                 if hasattr(module, 'register'):
@@ -487,7 +487,7 @@ def load_child_addon_functionality():
                         print(f"✓ Registered module: {module_name}")
                     except Exception as e:
                         print(f"⚠ Failed to register module {module_name}: {e}")
-
+            
             # Update tracking data
             tracking_data = get_child_addon_tracking_data()
             tracking_data["is_functionality_loaded"] = True
@@ -495,14 +495,14 @@ def load_child_addon_functionality():
                 tracking_data["active_parents"].append(PARENT_ADDON_UNIQUE_ID)
             tracking_data["last_activated_by"] = PARENT_ADDON_UNIQUE_ID
             save_child_addon_tracking_data(tracking_data)
-
+            
             print("✅ Child addon functionality loaded and registered")
             return True
-
+            
         finally:
             # Restore original sys.path
             sys.path = original_sys_path
-
+            
     except Exception as e:
         print(f"❌ Error loading child addon functionality: {e}")
         import traceback
@@ -516,47 +516,47 @@ def unload_child_addon_functionality(force=False):
         if not force and should_keep_child_addon_active():
             print(f"⚠ Not unloading child addon - other parent addons still active")
             return True
-
+        
         # We need to look for the modules we loaded in sys.modules
         # With our new approach, modules can be loaded as:
         # 1. "modular_child_addons" (package)
         # 2. "modular_child_addons.panels" (module in package)
         # 3. "modular_child_addons_panels" (old style, for compatibility)
         import sys
-
+        
         # Use centralized module list
         operator_submodules = ["geometry_nodes", "compositor", "shader"]
-
+        
         all_module_names = []
-
+        
         # Add package-style module names (new approach)
         package_name = "modular_child_addons"
         all_module_names.append(package_name)  # Main package
-
+        
         # Add dot-notation module names
         for name in CHILD_ADDON_ALL_MODULES:
             all_module_names.append(f"{package_name}.{name}")
-
+        
         # Add operator submodules
         all_module_names.append(f"{package_name}.operators")
         for name in operator_submodules:
             all_module_names.append(f"{package_name}.operators.{name}")
-
+        
         # Add underscore-style module names (old approach, for compatibility)
         for name in CHILD_ADDON_ALL_MODULES:
             all_module_names.append(f"{package_name}_{name}")
-
+        
         # Add operator submodules with underscores
         for name in operator_submodules:
             all_module_names.append(f"{package_name}_operators_{name}")
-
+        
         # Also check for the original module names (without prefix) as fallback
         for name in CHILD_ADDON_ALL_MODULES:
             all_module_names.append(name)
-
+        
         unregistered_count = 0
         modules_unregistered = []
-
+        
         for module_name in all_module_names:
             if module_name in sys.modules:
                 module = sys.modules[module_name]
@@ -571,7 +571,7 @@ def unload_child_addon_functionality(force=False):
                 else:
                     # Module doesn't have unregister, but we should still clean it up
                     print(f"⚠ Module {module_name} doesn't have unregister function")
-
+        
         # Also clean up the main package if it exists
         if package_name in sys.modules:
             # The main package itself might not have unregister, but we should clean it up
@@ -582,27 +582,27 @@ def unload_child_addon_functionality(force=False):
                     print(f"✓ Cleaned up package: {package_name}")
                 except KeyError:
                     pass
-
+        
         if unregistered_count > 0:
             # Update tracking data
             tracking_data = get_child_addon_tracking_data()
             tracking_data["is_functionality_loaded"] = False
             tracking_data["last_activated_by"] = None
             save_child_addon_tracking_data(tracking_data)
-
+            
             print(f"✅ Child addon functionality unloaded ({unregistered_count} modules)")
             return True
         else:
             print("⚠ No child addon modules found to unregister")
-
+            
             # Still update tracking data since we're unloading
             tracking_data = get_child_addon_tracking_data()
             tracking_data["is_functionality_loaded"] = False
             tracking_data["last_activated_by"] = None
             save_child_addon_tracking_data(tracking_data)
-
+            
             return True
-
+        
     except Exception as e:
         print(f"⚠ Error unloading child addon functionality: {e}")
         import traceback
@@ -630,12 +630,12 @@ def cleanup_existing_libraries(prefs, central_base):
     """
     # This is a simplified version - in production you'd want the full logic
     libraries_to_create = []
-
+    
     # Check which libraries already exist with correct paths
     for lib_name in CENTRAL_LIB_SUBFOLDERS:
         library_path = p.join(central_base, lib_name)
         lib_index = get_lib_path_index(prefs, lib_name, library_path)
-
+        
         if lib_index == -1:
             # Library doesn't exist
             libraries_to_create.append(lib_name)
@@ -646,7 +646,7 @@ def cleanup_existing_libraries(prefs, central_base):
                 # Update path
                 lib.path = library_path
                 print(f"✓ Updated library path: {lib_name}")
-
+    
     return libraries_to_create
 
 
@@ -663,18 +663,18 @@ def register_library(force_reregister=False):
         'version': PARENT_ADDON_VERSION,
         'unique_id': PARENT_ADDON_UNIQUE_ID
     }
-
+    
     # Check if already tracked
     addon_id = utility.get_addon_identifier(parent_addon_info)
     tracking_data = utility.read_addon_tracking(central_base)
     already_tracked = addon_id in tracking_data
-
+    
     if force_reregister and already_tracked:
         print(f"🔄 Forcing re-registration of tracked parent addon: {addon_id}")
         del tracking_data[addon_id]
         utility.write_addon_tracking(central_base, tracking_data)
         already_tracked = False
-
+    
     # Smart cleanup - update existing libraries to correct paths
     libraries_to_create = cleanup_existing_libraries(prefs, central_base)
 
@@ -692,7 +692,7 @@ def register_library(force_reregister=False):
     registered_count = 0
     for lib_name in existing_libraries:
         library_path = p.join(central_base, lib_name)
-
+        
         if lib_name in libraries_to_create:
             # Library doesn't exist, create it
             try:
@@ -744,7 +744,7 @@ def unregister_library():
         if active_addons == 0:
             # No other addons using any libraries, clean up
             print("🔄 Cleaning up libraries (parent addon is being uninstalled)...")
-
+            
             try:
                 prefs = bpy.context.preferences
                 for lib_name in CENTRAL_LIB_SUBFOLDERS:
@@ -754,7 +754,7 @@ def unregister_library():
                         bpy.ops.preferences.asset_library_remove(index=lib_index)
             except Exception as e:
                 print(f"⚠ Could not access preferences during unregistration: {e}")
-
+            
             # Clean up central library files
             try:
                 utility.cleanup_central_library(central_base)
@@ -762,7 +762,7 @@ def unregister_library():
                 print(f"⚠ Could not cleanup central library files: {e}")
         else:
             print(f"✓ {active_addons} addon(s) still using central library, keeping libraries registered")
-
+            
     except Exception as e:
         print(f"⚠ Error during library unregistration: {e}")
 
@@ -770,10 +770,10 @@ def unregister_library():
 def fully_uninstall_library():
     """Forcefully remove all libraries (for manual cleanup if needed)."""
     print("🗑️  Addon library cleanup initiated...")
-
+    
     try:
         central_base = get_central_library_base()
-
+        
         # Remove parent addon from tracking
         parent_addon_info = {
             'name': PARENT_ADDON_DISPLAY_NAME,
@@ -781,7 +781,7 @@ def fully_uninstall_library():
             'unique_id': PARENT_ADDON_UNIQUE_ID
         }
         utility.remove_addon_from_central_library(parent_addon_info, central_base, cleanup_mode='force')
-
+        
         # Remove libraries from preferences
         try:
             prefs = bpy.context.preferences
@@ -792,15 +792,15 @@ def fully_uninstall_library():
                     bpy.ops.preferences.asset_library_remove(index=lib_index)
         except Exception as e:
             print(f"⚠ Could not access preferences during forced cleanup: {e}")
-
+        
         # Force cleanup of central library files
         try:
             utility.cleanup_central_library(central_base)
         except Exception as e:
             print(f"⚠ Could not cleanup central library files: {e}")
-
+        
         print("✅ Addon library cleanup complete")
-
+        
     except Exception as e:
         print(f"⚠ Error during addon library cleanup: {e}")
 
@@ -809,7 +809,7 @@ def register_all_libraries():
     """Register the central asset library."""
     print("🔄 register_all_libraries() called")
     register_library()
-
+    
     # Try to refresh the asset browser UI
     try:
         bpy.ops.asset.library_refresh()
@@ -834,34 +834,34 @@ _library_refresh_done = False
 def delayed_setup():
     """Delayed setup called by timer."""
     global _library_refresh_done
-
+    
     if _library_refresh_done:
         return None  # Don't repeat timer
-
+    
     try:
         # Step 1: Register libraries (this will add us to central library tracking)
         register_all_libraries()
-
+        
         # Step 2: Ensure child addon files are installed
         ensure_child_addon_installed()
-
+        
         # Step 3: Load child addon functionality by default on first run
         # On subsequent runs, only load if user hasn't explicitly disabled it
         tracking_data = get_child_addon_tracking_data()
-
+        
         # Check if this is the first time this parent is running
         # (i.e., not in active_parents list yet)
         is_first_run = PARENT_ADDON_UNIQUE_ID not in tracking_data["active_parents"]
-
+        
         if is_first_run:
             # First time this parent is running - enable child addon by default
             print("🔄 First run detected - enabling child addon functionality by default")
-
+            
             # Add this parent to active parents
             tracking_data["active_parents"].append(PARENT_ADDON_UNIQUE_ID)
             tracking_data["last_activated_by"] = PARENT_ADDON_UNIQUE_ID
             save_child_addon_tracking_data(tracking_data)
-
+            
             # Load child addon functionality
             if load_child_addon_functionality():
                 print("✅ Child addon functionality loaded (first run)")
@@ -871,7 +871,7 @@ def delayed_setup():
             # Not first run - respect user's choice
             if PARENT_ADDON_UNIQUE_ID in tracking_data["active_parents"]:
                 print("🔄 Auto-loading child addon functionality (user previously enabled it)")
-
+                
                 if not tracking_data["is_functionality_loaded"]:
                     # Load child addon functionality if not already loaded
                     if load_child_addon_functionality():
@@ -882,19 +882,19 @@ def delayed_setup():
                     print("✓ Child addon functionality already loaded")
             else:
                 print("ℹ Child addon functionality not auto-loaded (user disabled it)")
-
+        
         # Step 4: Try to refresh asset browser
         try:
             bpy.ops.asset.library_refresh()
         except:
             pass
-
+        
         _library_refresh_done = True
         print("✅ Parent addon setup complete")
         print(f"📚 Child addon tracking: {len(tracking_data['active_parents'])} active parent(s)")
-
+        
         return None  # Don't repeat timer
-
+        
     except Exception as e:
         print(f"⚠ Delayed setup failed: {e}")
         import traceback
@@ -921,38 +921,38 @@ def unregister():
     """Unregister the parent addon."""
     global _library_refresh_done
     _library_refresh_done = True
-
+    
     # Remove timer
     try:
         if bpy.app.timers.is_registered(delayed_setup):
             bpy.app.timers.unregister(delayed_setup)
     except:
         pass
-
+    
     # Check if we should unload child addon functionality
     # First check if other parents are still active
     tracking_data = get_child_addon_tracking_data()
-
+    
     # Remove this parent from child addon tracking
     tracking_data = remove_parent_from_child_tracking()
-
+    
     # Only unload if no other parent addons are active
     if len(tracking_data["active_parents"]) == 0:
         print("🔄 No other parent addons active - unloading child addon functionality...")
         unload_child_addon_functionality(force=True)
     else:
         print(f"🔄 {len(tracking_data['active_parents'])} other parent(s) still active - keeping child addon loaded")
-
+    
     # Unregister the asset library from Blender preferences
     print("🔄 Unregistering asset library from preferences...")
     unregister_library()
-
+    
     # Check if there are any active addons using the central library
     try:
         central_base = get_central_library_base()
         active_addons = utility.get_active_addons_count(central_base)
         print(f"📚 Library status: {active_addons} addon(s) tracked in central library")
-
+        
         # Check if this parent addon is still tracked
         parent_addon_info = {
             'name': PARENT_ADDON_DISPLAY_NAME,
@@ -961,17 +961,17 @@ def unregister():
         }
         addon_id = utility.get_addon_identifier(parent_addon_info)
         library_tracking_data = utility.read_addon_tracking(central_base)
-
+        
         # Remove this addon from central library tracking
         if addon_id in library_tracking_data:
             print(f"🔄 Removing {PARENT_ADDON_DISPLAY_NAME} from central library tracking")
             del library_tracking_data[addon_id]
             utility.write_addon_tracking(central_base, library_tracking_data)
-
+            
             # Update active addons count after removal
             active_addons = len(library_tracking_data)
             print(f"📚 Updated library status: {active_addons} addon(s) remaining")
-
+        
         # Check if we should remove child addon files
         # Only remove if no other addons are using the central library AND no parent addons are active
         if active_addons == 0 and len(tracking_data["active_parents"]) == 0:
