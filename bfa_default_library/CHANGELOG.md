@@ -51,7 +51,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Removed 9 stub files (~280 lines total)
 - Removed 2 redundant documentation files
 
-## [1.2.7] - Previous Release
+## [1.2.7] - Previous iteration
 
 ### Features
 - Modular parent/child addon architecture
