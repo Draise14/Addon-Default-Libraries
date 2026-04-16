@@ -44,7 +44,7 @@ from . import utility
 bl_info = {
     "name": "Default Asset Library",
     "author": "Andres (Draise) Stephens, Ereaser45-Studios, Iyad Ahmed, Juan Carlos Aragon",
-    "version": (1, 3, 0),
+    "version": (1, 3, 1),
     "blender": (5, 0, 1),
     "location": "Asset Browser>Default Library",
     "description": "Adds a modular default asset library and addon with wizards and complementary operators",
@@ -59,7 +59,7 @@ bl_info = {
 # TO DO: Update hte version in the bl_info above as well for consistency
 PARENT_ADDON_UNIQUE_ID = "default_asset_library_1_3_0"
 PARENT_ADDON_DISPLAY_NAME = "Default Asset Library"
-PARENT_ADDON_VERSION = (1, 3, 0)
+PARENT_ADDON_VERSION = (1, 3, 1)
 
 # Child addon info - this is the functional addon
 # TO DO: Update the child_addon/blender_manifest.toml to reflect this version as well for consistency
