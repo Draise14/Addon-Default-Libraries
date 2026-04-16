@@ -7,13 +7,13 @@ schema_version = "2.0.0"
 
 id = "bfa_default_library"
 name = "Default Asset Library"
-version = "2.0.0"
-blender_version_min = "4.4.0"
-author = "Andres (Draise) Stephens"
+version = "1.3.0"
+blender_version_min = "5.0.0"
+author = "Andres (Draise) Stephens and the Bforartists Team"
 maintainer = "Andres (Draise) Stephens"
 tagline = "A default asset library"
 type = "add-on"
-description = "Adds a default asset library and addon with wizards and complementary operators"
+description = "Adds a default asset library and addon with wizards and complementary operators to get started out of the box with Bforartists. The library includes a collection of assets, such as materials, objects, and node groups, that can be used in your projects. The addon provides wizards and operators to help you manage and use the asset library effectively."
 license = ["SPDX:GPL-3.0-or-later",]
 repository = "https://github.com/Bforartists/Bforartists"
 
@@ -22,7 +22,7 @@ repository = "https://github.com/Bforartists/Bforartists"
 
 # # Optional: tag list defined by Blender and server, see:
 # # https://docs.blender.org/manual/en/dev/advanced/extensions/tags.html
-tags = ["Geometry Nodes", "Mesh", "Object"]
+tags = ["Geometry Nodes", "Mesh", "Object", "Material", "Node", "Lighting"]
 
 
 # # Optional: Blender version that the extension does not support, earlier versions are supported.
