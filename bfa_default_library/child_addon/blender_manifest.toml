@@ -1,29 +1,23 @@
-
 # bl_extension.toml
 schema_version = "2.0.0"
 
 # Example of manifest file for a Blender extension
 # Change the values according to your extension
-
-id = "bfa_default_library"
-name = "Default Asset Library"
-version = "2.0.0"
+id = "modular_child_addons"
+name = "Default Asset Library Functions"
+version = "1.0.2"
 blender_version_min = "4.4.0"
 author = "Andres (Draise) Stephens"
 maintainer = "Andres (Draise) Stephens"
-tagline = "A default asset library"
+tagline = "Default Asset Library Functions for wizards and operators"
 type = "add-on"
-description = "Adds a default asset library and addon with wizards and complementary operators"
+description = "These functions are bundled with the Default Asset Library addon for wizards and library operators. This is only a symbolic addon entry. You can safely uninstall without a problem."
 license = ["SPDX:GPL-3.0-or-later",]
 repository = "https://github.com/Bforartists/Bforartists"
+warning = "This is automatically copied to the user preferences when the Default Asset Library addon is installed or updated."
 
 # # Optional: link to documentation, support, source files, etc
- website = "https://www.bforartists.de/data/manualbfa4/28.1_Asset_Browser_-_Default_Asset_LIbrary.pdf"
-
-# # Optional: tag list defined by Blender and server, see:
-# # https://docs.blender.org/manual/en/dev/advanced/extensions/tags.html
-tags = ["Geometry Nodes", "Mesh", "Object"]
-
+website = "https://www.bforartists.de/data/manualbfa4/28.1_Asset_Browser_-_Default_Asset_LIbrary.pdf"
 
 # # Optional: Blender version that the extension does not support, earlier versions are supported.
 # # This can be omitted and defined later on the extensions platform if an issue is found.
